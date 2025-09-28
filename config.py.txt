@@ -123,3 +123,5 @@ quick_check             = True                                       # Quick che
 func_show_delay         = False                                      # When set to True, delay messages are always shown
 func_norm_delay         = 2500                                        # Show message when execution of a function is greater in ms
 func_warn_delay         = 5000                                       # Show warning when execution of a function is greater in ms
+uptime_delay            = 10000                                      # Show uptime ping message if no ticker is received
+uptime_expire           = 3600000                                    # Maximum time between tickers before Sunflow will exit

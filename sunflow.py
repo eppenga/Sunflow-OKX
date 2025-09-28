@@ -188,8 +188,8 @@ lock_ticker['enabled']               = False
 uptime_ping                          = {}
 uptime_ping['time']                  = timestamp
 uptime_ping['record']                = timestamp
-uptime_ping['delay']                 = 10000
-uptime_ping['expire']                = 1000000                                     # 10 Seconds
+uptime_ping['delay']                 = config.uptime_delay                         # 10 seconds
+uptime_ping['expire']                = config.uptime_expire                        # 1 hour
 uptime_ping['enabled']               = True
 
 # Periodic tasks
