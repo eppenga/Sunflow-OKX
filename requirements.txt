@@ -1,0 +1,5 @@
+python-okx
+pytz
+websockets
+pandas
+pandas-ta

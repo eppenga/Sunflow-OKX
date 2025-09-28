@@ -1,0 +1,125 @@
+### Sunflow Cryptobot ###
+#
+# Config file
+
+## CHANGE TO YOUR LIKING
+
+# Defaults
+symbol                  = "XRP-EUR"    # Symbol bot used for trading
+profit                  = 0.300        # Minimum profit percentage
+multiplier              = 1.00         # Multiply minimum order quantity by this factor
+spike_margin            = 1.00         # Margin in percent to prevent false spike detection in orders
+
+# Wave
+wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot, Wave, ATR, EMA or Hybrid
+wave_distance           = 0.080        # Trigger price distance percentage when Fixed is used by wiggle
+wave_timeframe          = 5000         # Timeframe in ms to measure wave length, used when wiggle uses Wave, EMA or Hybrid
+wave_multiplier         = 1.00         # Multiply wave percentage by this multiplier
+
+# Spread indicators
+spread_enabled          = True         # Use spread as buy indicator
+spread_distance         = 0.050        # Minimum spread in percentages
+
+# Technical indicators
+indicators_enabled      = False        # Use technical indicators as buy indicator
+indicators_minimum      = -0.25        # Minimum advice value
+indicators_maximum      = +0.50        # Maximum advice value
+indicators_limit        = 250          # Number of klines downloaded, used for calculcating technical indicators (preferable 250)
+indicators_average      = True         # Calculate the average over the active intervals or treat them separately
+indicators_interval_1   = '1m'         # Klines timeframe default interval in minutes
+indicators_interval_2   = '3m'         # Klines timeframe first confirmation interval, set to '' if you do not want to use this
+indicators_interval_3   = '5m'         # Klines timeframe second confirmation interval, set to '' if you do not want to use this
+
+# Exchange data (ALWAYS KEEP THESE SECRET) - Sunflow
+api_key                 = "01234567-89ab-cdef-0123-456789abcdef"            # API Key
+api_secret              = "0123456789ABCDEF0123456789ABCDEF"                # API Secret
+api_site                = "https://my.okx.com"                              # API Registration website
+api_ws_public           = "wss://ws.okx.com:8443/ws/v5/public"              # API Public Websocket
+api_ws_business         = "wss://ws.okx.com:8443/ws/v5/business"            # API Business Websocket
+api_ch_orderbook        = "books"                                           # API Orderbook Channel type
+api_passphrase          = "abcdefghijklmnopqrstuvwxyz"                      # API Passphrase
+api_env                 = "0"                                               # Production trading: "0", demo trading: "1"
+
+
+## EXPERIMENTAL INDICATORS
+
+# Orderbook indicators
+orderbook_enabled       = False        # Use orderbook as buy indicator
+orderbook_bandwith      = 0.10         # Depth in percentages used to calculate market depth from orderbook
+orderbook_minimum       = 0            # Minimum orderbook buy depth percentage
+orderbook_maximum       = 50           # Maximum orderbook buy depth percentage
+orderbook_window        = 5000        # Rolling window orderbook data
+orderbook_average       = True         # Average out orderbook depth data or use last data point
+orderbook_limit         = 50         # Number of orderbook data elements to keep in database
+orderbook_timeframe     = 5000         # Timeframe in ms for averaging out
+
+# Trade indicators
+trade_enabled           = False        # Use trades as buy indicator
+trade_minimum           = 50           # Minimum trade buy ratio percentage
+trade_maximum           = 100          # Maximum trade buy ratio percentage
+trade_limit             = 100          # Number of trade orders to keep in database
+trade_timeframe         = 5000        # Timeframe in ms to collect realtime trades
+
+
+## EXPERIMENTAL FEATURES
+
+# Compounding
+compounding_enabled     = False        # Use compounding to adjust minimum order value
+compounding_start       = 1000         # Amount in quote asset when the Sunflow started
+
+# Price limits
+pricelimit_enabled      = False        # Use price limits
+pricelimit_min_buy      = 0            # Maximum buy price, set to 0 if do not want to use this
+pricelimit_max_buy      = 0            # Maximum buy price, set to 0 if do not want to use this
+pricelimit_min_sell     = 0            # Minimum sell price, set to 0 if do not want to use this
+pricelimit_max_sell     = 0            # Maximum sell price, set to 0 if do not want to use this
+
+# Optimizer
+optimizer_enabled       = False        # Try to optimize the minimum profit and trigger price distance percentage
+optimizer_spread        = False        # If optimize is active, also optimize spread distance
+optimizer_sides         = "Buy,Sell"   # When optimizing optimize both on buy and sell or only sell
+optimizer_method        = "Volatility" # Method used to optimize distance, profit and / or spread
+optimizer_interval      = 30           # Interval in minutes used for indicator KPI
+optimizer_delta         = "min"        # Delta  used for indicator KPI (s, min or h)
+optimizer_limit_min     = 25920000     # Minimum miliseconds of spot price data (8,640,000 is one day)
+optimizer_limit_max     = 864000000    # Maximum miliseconds of spot price data
+optimizer_adj_min       = 0            # Minimum profit and trigger price adjustment (-50 = halve)
+optimizer_adj_max       = 100          # Maximum profit and trigger price adjustment (100 = double)
+optimizer_scaler        = 1.0          # Multiply optimized profit and trigger price distance by this factor
+
+
+## ONLY FOR ADVANCED USERS
+
+# Load external libraries
+from pathlib import Path
+
+# Get current filename without .py
+config_path             = Path(__file__)
+config_file             = config_path.stem + "_"
+if config_file         == "config_": config_file = ""
+
+# Data storage
+data_folder             = "data/"                                    # Where is data stored
+data_suffix             = data_folder + config_file                  # Format of data and log files
+dbase_file              = data_suffix + "buy_orders.json"            # Database file buy orders
+exchange_file           = data_suffix + "exchange.log"               # Exchange log file
+error_file              = data_suffix + "errors.log"                 # Error log file
+revenue_file            = data_suffix + "revenue.log"                # Revenue log file
+
+# Debug, logs, reporting and other switches
+debug                   = False                                      # Turn debug on or off
+timeutc_std             = False                                      # Use UTC or local time, please set timezone accordingly
+timezone_str            = "Europe/Amsterdam"                         # Timezone to use when displaying local time 
+exchange_log            = True                                       # Keep a log of all exchange sessions
+exchange_log_full       = False                                      # Extended or normal logging to file
+revenue_log             = True                                       # Log revenue of Sunflow to file
+revenue_log_full        = False                                      # Extended or normal logging to file
+revenue_log_sides       = True                                       # Log buy and sell orders or only sell to file
+wallet_report           = True                                       # Report wallet value, database and coins (also used by compounding)
+session_report          = True                                       # Report exchange sessions to stdout
+database_rebalance      = True                                       # Sync the base asset of the buys database to the exchange
+protect_peaks           = True                                       # Slow down distance to minimum
+quick_check             = True                                       # Quick check orders on startup
+func_show_delay         = False                                      # When set to True, delay messages are always shown
+func_norm_delay         = 2500                                        # Show message when execution of a function is greater in ms
+func_warn_delay         = 5000                                       # Show warning when execution of a function is greater in ms
