@@ -1,0 +1,27 @@
+# Ignore hidden folders
+/.archive
+/.backup
+/.examples
+
+# Ignore hidden files
+.gitattributes
+
+# Ignore application files
+*copy*
+*.backup
+*.bak
+config*.py
+test*.*
+todo*
+/data
+/backup
+/symbols
+/outputs
+/test
+
+# Ignore helper files
+*.sh
+checksum.txt
+
+# Ignore python
+/__pycache__
