@@ -160,7 +160,7 @@ def check_spike(spot, active_order, order, all_buys, info):
     elif active_order['side'] == "Buy":
 
         # Did it spike and was forgotten when buying
-        if order['triggerPrice'] < spot* (1 - (spike_margin / 100)):
+        if order['triggerPrice'] < spot * (1 - (spike_margin / 100)):
             defs.announce("*** Warning: Buy order spiked, cancelling current order! ***")
             
             # Remove order from Sunflow
@@ -261,7 +261,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
         return active_order, all_buys, all_sells, order, revenue
 
     # Glue order and fills together
-    order = orders.merge_order_fills(order,fills)
+    order = orders.merge_order_fills(order, fills, info)
     defs.announce(f"Merged order {active_order['orderid']} with fills from linked SL order {active_order['linkedid']}")
 
     # Set Sunflow order status to Closed

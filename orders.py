@@ -184,7 +184,7 @@ def decode_fills(response):
     # Map fills to response
     fills['avgPrice']      = float(result['fillPx'])                        # Average fill price in quote (USDT)
     fills['cumExecQty']    = float(result['fillSz'])                        # Cumulative executed quantity in base (BTC)
-    fills['cumExecValue']  = float(result['fillPx'] * result['fillSz'])     # Cumulative executed value (USDT)
+    fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value (USDT)
     fills['cumExecFee']    = float(result['fee'])                           # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
     fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency 
 
@@ -198,7 +198,7 @@ def decode_fills(response):
     return fills
 
 # Merge order and fills
-def merge_order_fills(order, fills):
+def merge_order_fills(order, fills, info):
 
     # Debug
     debug = True
@@ -206,7 +206,7 @@ def merge_order_fills(order, fills):
     # Merge fills into order
     order['avgPrice']      = fills['avgPrice']
     order['cumExecQty']    = fills['cumExecQty']
-    order['cumExecValue']  = fills['cumExecValue']
+    order['cumExecValue']  = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")   
     order['cumExecFee']    = fills['cumExecFee']
     order['cumExecFeeCcy'] = fills['cumExecFeeCcy']
     

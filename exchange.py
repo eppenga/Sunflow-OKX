@@ -297,6 +297,53 @@ def get_fees():
     # Return data
     return response, error_code, error_msg
 
+# Get balance
+def get_balance(currency):
+    
+    # Debug
+    debug = False
+    
+    # Initialize variables
+    response    = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False
+
+    # Get reponse
+    for attempt in range(2):    
+        message = defs.announce("session: accountAPI.get_account_balance()")
+        try:
+            response = accountAPI.get_account_balance(
+                ccy = currency
+            )
+        except Exception as e:
+            message = f"*** Error: Failed to get balance for {currency} ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result     = check_response(response)
+        error_code = result[4]
+        error_msg  = result[5]
+
+        # Check API rate limit
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if not rate_limit: break
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+
 # Post order
 def place_order(active_order):
 
@@ -389,6 +436,54 @@ def get_order(orderid):
             )
         except Exception as e:
             message = f"*** Error: Failed to get information on order {orderid} ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result     = check_response(response)
+        error_code = result[4]
+        error_msg  = result[5]
+
+        # Check API rate limit
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if not rate_limit: break
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+
+# Get fills
+def get_fills(orderid):
+
+    # Debug
+    debug = True
+    
+    # Initialize variables
+    response    = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False
+
+    # Get reponse
+    for attempt in range(2):    
+        message = defs.announce("session: tradeAPI.get_fills()")
+        try:
+            response = tradeAPI.get_fills(
+                instType = "SPOT",
+                ordId    = orderid,
+            )
+        except Exception as e:
+            message = f"*** Error: Failed to get fills for order {orderid} ***\n>>> Message: {e}"
             defs.log_error(message)
 
         # Log response
@@ -527,99 +622,3 @@ def amend_order(orderid, new_price=0, new_qty=0):
 
     # Return data
     return response, error_code, error_msg
-
-# Get balance
-def get_balance(currency):
-    
-    # Debug
-    debug = False
-    
-    # Initialize variables
-    response    = {}
-    error_code = 0
-    error_msg  = ""
-    rate_limit = False
-
-    # Get reponse
-    for attempt in range(2):    
-        message = defs.announce("session: accountAPI.get_account_balance()")
-        try:
-            response = accountAPI.get_account_balance(
-                ccy = currency
-            )
-        except Exception as e:
-            message = f"*** Error: Failed to get balance for {currency} ***\n>>> Message: {e}"
-            defs.log_error(message)
-
-        # Log response
-        if config.exchange_log:
-            defs.log_exchange(response, message)
-
-        # Check response for errors
-        result     = check_response(response)
-        error_code = result[4]
-        error_msg  = result[5]
-
-        # Check API rate limit
-        rate_limit = check_limit(result[0], result[2])
-        
-        # Break out of loop
-        if not rate_limit: break
-
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: Exchange response:")
-        pprint.pprint(response)
-        print()
-
-    # Return data
-    return response, error_code, error_msg
-    
-# Get fills
-def get_fills(orderid):
-
-    # Debug
-    debug = True
-    
-    # Initialize variables
-    response    = {}
-    error_code = 0
-    error_msg  = ""
-    rate_limit = False
-
-    # Get reponse
-    for attempt in range(2):    
-        message = defs.announce("session: tradeAPI.get_fills()")
-        try:
-            response = tradeAPI.get_fills(
-                instType = "SPOT",
-                ordId    = orderid,
-            )
-        except Exception as e:
-            message = f"*** Error: Failed to get fills for order {orderid} ***\n>>> Message: {e}"
-            defs.log_error(message)
-
-        # Log response
-        if config.exchange_log:
-            defs.log_exchange(response, message)
-
-        # Check response for errors
-        result     = check_response(response)
-        error_code = result[4]
-        error_msg  = result[5]
-
-        # Check API rate limit
-        rate_limit = check_limit(result[0], result[2])
-        
-        # Break out of loop
-        if not rate_limit: break
-
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: Exchange response:")
-        pprint.pprint(response)
-        print()
-
-    # Return data
-    return response, error_code, error_msg
-        
