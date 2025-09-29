@@ -579,7 +579,7 @@ def get_balance(currency):
 def get_fills(orderid):
 
     # Debug
-    debug = False
+    debug = True
     
     # Initialize variables
     response    = {}

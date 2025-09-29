@@ -16,7 +16,7 @@ config = load_config()
 stuck             = {}
 stuck['check']    = True
 stuck['time']     = defs.now_utc()[4]
-stuck['interval'] = 20000
+stuck['interval'] = config.stuck_interval
    
 # Check if we can do trailing buy or sell
 def check_order(spot, compounding, active_order, all_buys, all_sells, info):
@@ -221,7 +221,7 @@ def calculate_revenue(order, all_sells, spot, info):
 def close_trail(active_order, all_buys, all_sells, spot, info):
 
     # Debug and speed
-    debug = False
+    debug = True
     speed = True
     stime = defs.now_utc()[4]
     
@@ -236,20 +236,25 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
     order      = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
-    # Check closed order for errors
     if error_code != 0:
         message = f"*** Error: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
         return active_order, all_buys, all_sells, order, revenue
 
-    # Get fills for the closed order
+    # Add linked order to active_order
+    active_order['linkedid'] = order['linkedid']
+    
+    # Debug to stdout
+    if debug:
+        defs.announce(f"Active order data:")
+        pprint.pprint(active_order)
+        print()
+
+    # Get fills for the closed order   
     result     = orders.get_fills(active_order['linkedid'])
     fills      = result[0]
     error_code = result[1]
     error_msg  = result[2]
-
-    # Check fills for errors
     if error_code != 0:
         message = f"*** Error: Failed to get fills when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
@@ -257,6 +262,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
 
     # Glue order and fills together
     order = orders.merge_order_fills(order,fills)
+    defs.announce(f"Merged order {active_order['orderid']} with fills from linked SL order {active_order['linkedid']}")
 
     # Set Sunflow order status to Closed
     order['status'] = "Closed"
@@ -422,8 +428,6 @@ def amend_qty_sell(active_order, info):
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
-
-    # Check for errors in amended order    
     if error_code != 0:
         message = f"*** Warning: Something went wrong when trying to amend the quantity! ***"
         defs.log_error(message)
@@ -504,8 +508,6 @@ def amend_trigger_price(active_order, info):
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
-
-    # Check for errors in amended order    
     if error_code != 0:
         message = f"*** Warning: Something went wrong when trying to amend the price! ***"
         defs.log_error(message)

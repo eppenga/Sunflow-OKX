@@ -228,6 +228,10 @@ def order_count(all_buys, info):
     total_qty   = sum(item['cumExecQty'] for item in all_buys)
     total_qty   = defs.round_number(total_qty, info['basePrecision'], "down")
 
+    # Debug to stdout
+    if debug:
+        defs.announce(f"Debug: Order count is {order_count} abd total quantity is {total_qty}")
+
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
     

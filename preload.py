@@ -320,8 +320,6 @@ def check_orders(all_buys, info):
                 temp_order = result[0]
                 error_code = result[1]
                 error_msg  = result[2]
-                
-                # Check for errors
                 if error_code != 0:
                     message = f"*** Error: Failed to get order! ***\n>>> Message: {error_code} - {error_msg}"
                     defs.log_error(message)
@@ -338,7 +336,6 @@ def check_orders(all_buys, info):
             temp_order = result[0]
             error_code = result[1]
             error_msg  = result[2]
-
             if error_code != 0:
                 message = f"*** Error: Failed to get order! ***\n>>> Message: {error_code} - {error_msg}"
                 defs.log_error(message)

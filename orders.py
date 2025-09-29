@@ -550,8 +550,6 @@ def get_balance(currency):
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
-    # Check for errors in balance data
     if error_code != 0:
         message = f"*** Error: Failed to get balance for {currency}! ***"
         defs.log_error(message)
@@ -599,8 +597,6 @@ def rebalance(all_buys, info):
     equity_balance = result[0]
     error_code     = result[1]
     error_msg      = result[2]
-    
-    # Check for errors in balance
     if error_code != 0:
         message = f"*** Error: Failed to get balance! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
@@ -674,8 +670,6 @@ def report_wallet(spot, all_buys, info):
     base_exchange = result[0]
     error_code    = result[1]
     error_msg     = result[2]
-    
-    # Check for errors in balance for base currency
     if error_code != 0:
         message = f"*** Error: Failed to get balance for base currency! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
@@ -685,8 +679,6 @@ def report_wallet(spot, all_buys, info):
     quote_exchange = result[0]
     error_code     = result[1]
     error_msg      = result[2]
-    
-    # Check for errors in balance for base currency
     if error_code != 0:
         message = f"*** Error: Failed to get balance for quote currency! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
