@@ -186,7 +186,7 @@ def decode_fills(response):
     fills['cumExecQty']    = float(result['fillSz'])                        # Cumulative executed quantity in base (BTC)
     fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value (USDT)
     fills['cumExecFee']    = float(result['fee'])                           # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
-    fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency 
+    fills['cumExecFeeCcy'] = result['feeCcy'] * -1                          # Cumulative executed fee currency 
 
     # Debug to stdout
     if debug:

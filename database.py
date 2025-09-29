@@ -73,7 +73,10 @@ def remove(active_order, all_buys, info):
     debug = False
     
     # Initialize variables
+    result     = ()
+    response   = {}
     error_code = 0
+    error_msg  = ""
     
     # Debug
     if debug:
@@ -82,8 +85,11 @@ def remove(active_order, all_buys, info):
     # Reset active_order
     active_order['active'] = False
     
-    # Remove order from exchange
-    error_code = orders.cancel_order(active_order['orderid'])
+    # Remove order from exchange, error handling is happening in next functions
+    result     = orders.cancel_order(active_order['orderid'])
+    response   = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
     
     # Remove order from database
     if active_order['side'] == "Buy":
@@ -94,7 +100,7 @@ def remove(active_order, all_buys, info):
         all_buys = orders.rebalance(all_buys, info)
     
     # Return
-    active_order, all_buys, error_code
+    active_order, all_buys, error_code, error_msg
 
 # Remove an order from the all buys database file
 def remove_buy(orderid, all_buys, info):

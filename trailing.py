@@ -156,6 +156,7 @@ def check_spike(spot, active_order, order, all_buys, info):
             active_order = result[0]
             all_buys     = result[1]
             error_code   = result[2]
+            error_msg    = result[3]
 
     elif active_order['side'] == "Buy":
 
@@ -168,9 +169,10 @@ def check_spike(spot, active_order, order, all_buys, info):
             active_order = result[0]
             all_buys     = result[1]
             error_code   = result[2]
+            error_msg    = result[3]
     
     if error_code != 0:
-        message = f"*** Warning: Order '{active_order['orderid']}' spiked, but order was not found at exchange! ***"
+        message = f"*** Warning: Order '{active_order['orderid']}' spiked! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
     # Report execution time
@@ -356,7 +358,9 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
 
         # Amend trigger price
         if do_amend:
-            active_order = atp_helper(active_order, info)
+            result       = atp_helper(active_order, all_buys, info)
+            active_order = result[0]
+            all_buys     = result[1]
         
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -446,7 +450,7 @@ def amend_qty_sell(active_order, info):
     return response, error_code, error_msg
 
 # Change quantity trailing sell helper
-def atp_helper(active_order, info):
+def atp_helper(active_order, all_buys, info):
 
     # Initialize variables
     debug      = False
@@ -475,6 +479,22 @@ def atp_helper(active_order, info):
         # Order does not exist, trailing order sold or bought in between
         defs.announce(f"Adjusting trigger price not possible, {active_order['side'].lower()} order already hit")
 
+    elif error_code == 51280:
+    
+        # Order went up to fast, reset and replace
+        message = f"*** Warning: Probably price went up to fast probably while selling, trailing cancelled ***\n>>> Message: {error_code} - {error_msg}"
+        defs.announce(message)
+
+        # Try to remove order
+        result       = database.remove(active_order, all_buys, info)
+        active_order = result[0]
+        all_buys     = result[1]
+        error_code   = result[2]
+        error_msg    = result[3]
+        if error_code !=0:
+            message = f"*** Warning: Trying to remove order while trailing ***\n>>> Message: {error_code} - {error_msg}"
+            defs.log_error(message)
+    
     else:
 
         # Critical error, let's log it and revert
@@ -482,7 +502,7 @@ def atp_helper(active_order, info):
         defs.log_error(message)
     
     # Return active_order
-    return active_order
+    return active_order, all_buys
 
 # Change the trigger price of the current trailing sell
 def amend_trigger_price(active_order, info):
