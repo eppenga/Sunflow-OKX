@@ -194,7 +194,7 @@ def get_klines(interval, limit):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -242,7 +242,7 @@ def get_instruments():
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -290,7 +290,7 @@ def get_fees():
        
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -361,7 +361,7 @@ def place_order(active_order):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -408,7 +408,7 @@ def get_order(orderid):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -456,7 +456,7 @@ def cancel_order(orderid):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -521,7 +521,7 @@ def amend_order(orderid, new_price=0, new_qty=0):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
@@ -568,10 +568,58 @@ def get_balance(currency):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Exchange data:")
+        defs.announce("Debug: Exchange response:")
         pprint.pprint(response)
         print()
 
     # Return data
     return response, error_code, error_msg
     
+# Get fills
+def get_fills(orderid):
+
+    # Debug
+    debug = False
+    
+    # Initialize variables
+    response    = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False
+
+    # Get reponse
+    for attempt in range(2):    
+        message = defs.announce("session: tradeAPI.get_fills()")
+        try:
+            response = tradeAPI.get_fills(
+                instType = "SPOT",
+                ordId    = orderid,
+            )
+        except Exception as e:
+            message = f"*** Error: Failed to get fills for order {orderid} ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result     = check_response(response)
+        error_code = result[4]
+        error_msg  = result[5]
+
+        # Check API rate limit
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if not rate_limit: break
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+        

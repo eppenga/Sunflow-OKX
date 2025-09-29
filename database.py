@@ -185,7 +185,7 @@ def register_sell(all_buys, all_sells, info):
     # Get a set of all sell order IDs for efficient lookup
     sell_order_ids = {sell['orderid'] for sell in all_sells}
 
-    # Filter out all_buys entries that have their orderLinkId in sell_order_ids
+    # Filter out all_buys entries that have their orderid in sell_order_ids
     filtered_buys = [buy for buy in all_buys if buy['orderid'] not in sell_order_ids]
 
     # Count unique order ids

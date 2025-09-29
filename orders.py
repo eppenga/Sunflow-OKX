@@ -12,8 +12,8 @@ import database, defs, exchange, distance, preload
 # Load config
 config = load_config()
 
-# Get order history
-def get_order(orderid, info):
+# Get order details
+def get_order(orderid):
     
     # Debug and speed
     debug = False
@@ -35,7 +35,7 @@ def get_order(orderid, info):
     
     # Decode response to order
     if error_code == 0:
-        order = decode_response(response, info)
+        order = decode_order(response)
     
     # Debug to stdout
     if debug:
@@ -51,6 +51,46 @@ def get_order(orderid, info):
 
     # Return order
     return order, error_code, error_msg
+
+# Get order fills
+def get_fills(orderid):
+
+    # Debug and speed
+    debug = False
+    speed = True
+    stime = defs.now_utc()[4]
+        
+    # Initialize variables
+    fills      = {}
+    response   = {}
+    result     = ()
+    error_code = 0
+    error_msg  = ""
+
+    # Get response from exchange
+    result     = exchange.get_fills(orderid)
+    response   = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
+    
+    # Decode response to order
+    if error_code == 0:
+        fills = decode_fills(response)
+    
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Fill details via exchange")
+        pprint.pprint(response)
+        print()
+        defs.announce("Debug: Fill details decoded")
+        pprint.pprint(fills)
+        print()
+
+    # Report execution time
+    if speed: defs.announce(defs.report_exec(stime))
+
+    # Return order
+    return fills, error_code, error_msg
 
 # Cancel an order at the exchange
 def cancel_order(orderid):
@@ -82,15 +122,15 @@ def cancel_order(orderid):
     # Return error code
     return response, error_code, error_msg
 
-# Decode transaction from exchange to proper dictionary
-def decode_response(response, info):
+# Decode response from exchange to proper dictionary
+def decode_order(response):
     
     # Debug
     debug = False
     
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Transaction before decode:")
+        defs.announce("Debug: Before decode:")
         pprint.pprint(response)
         print()
 
@@ -98,40 +138,86 @@ def decode_response(response, info):
     order  = {}
     result = response['data'][0]
 
-    # Map order to transaction
-    order['createdTime']   = int(result['cTime'])                      #* Creation timestamp in ms
-    order['updatedTime']   = int(result['uTime'])                      #* Last update timestamp in ms
-    order['orderid']       = result['algoId']                          #* Order ID by exchange
-    order['symbol']        = result['instId']                          #* Symbol
-    order['side']          = result['side'].capitalize()               #* Buy or Sell
-    order['orderType']     = result['ordType'].capitalize()            #* Order type: Market, Limit, etc...
-    order['orderStatus']   = result['state'].capitalize()              #* Order state: Live, Pause, Partially_effective, Effective, Canceled, Order_failed, Partially_failed
-    order['price']         = float(result.get('last'))                 # Price in quote (USDT)    **** or use fillPx ?
-    order['avgPrice']      = float(result.get('actualPx') or 0)        #* Average fill price in quote (USDT)
-    order['qty']           = float(result.get('sz'))                   #* Quantity in base (BTC)
-    order['cumExecQty']    = float(result.get('actualSz') or 0)        #* Cumulative executed quantity in base (BTC)
-    order['cumExecValue']  = order['cumExecQty'] * order['price']      #* Cumulative executed value (USDT)
-    order['cumExecFee']    = 0                                         # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
-    order['cumExecFeeCcy'] = ''                                        # Cumulative executed fee currency 
-    order['triggerPrice']  = float(result.get('slTriggerPx'))          #* Trigger price in quote (USDT)
-
-    # Calculate fee and set fee currency
-    if "effective" in order['orderStatus']:
-        if order['side'] == "Buy":
-            order['cumExecFee']    = order['cumExecQty'] * info['feeTaker']
-            order['cumExecFeeCcy'] = info['baseCoin']
-        elif order['side'] == "Sell":
-            order['cumExecFee']    = order['cumExecValue'] * info['feeTaker']
-            order['cumExecFeeCcy'] = info['quoteCoin']       
+    # Map order to response
+    order['createdTime']   = int(result['cTime'])                           # Creation timestamp in ms
+    order['updatedTime']   = int(result['uTime'])                           # Last update timestamp in ms
+    order['orderid']       = result['algoId']                               # Order ID by exchange
+    order['linkedid']      = result['ordId']                                # Linked SL order ID
+    order['symbol']        = result['instId']                               # Symbol
+    order['side']          = result['side'].capitalize()                    # Buy or Sell
+    order['orderType']     = result['ordType'].capitalize()                 # Order type: Market, Limit, etc...
+    order['orderStatus']   = result['state'].capitalize()                   # Order state: Live, Pause, Partially_effective, Effective, Canceled, Order_failed, Partially_failed
+    order['price']         = float(result.get('last'))                      # Last price available in quote (USDT)
+    order['qty']           = float(result.get('sz'))                        # Quantity in base (BTC)
+    order['triggerPrice']  = float(result.get('slTriggerPx'))               # Trigger price in quote (USDT)
+    order['avgPrice']      = 0                                              # Average fill price in quote (USDT)
+    order['cumExecQty']    = 0                                              # Cumulative executed quantity in base (BTC)
+    order['cumExecValue']  = 0                                              # Cumulative executed value (USDT)
+    order['cumExecFee']    = 0                                              # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
+    order['cumExecFeeCcy'] = ''                                             # Cumulative executed fee currency 
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Order after decode:")
+        defs.announce("Debug: After decode:")
         pprint.pprint(order)
         print()
 
     # Return order
     return order
+
+# Decode fills from exchange to proper dictionary
+def decode_fills(response):
+    
+    # Debug
+    debug = False
+    
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Before decode:")
+        pprint.pprint(response)
+        print()
+
+    # Initialize variables
+    fills  = {}
+    result = response['data'][0]
+
+    # Map fills to response
+    fills['avgPrice']      = float(result['fillPx'])                        # Average fill price in quote (USDT)
+    fills['cumExecQty']    = float(result['fillSz'])                        # Cumulative executed quantity in base (BTC)
+    fills['cumExecValue']  = float(result['fillPx'] * result['fillSz'])     # Cumulative executed value (USDT)
+    fills['cumExecFee']    = float(result['fee'])                           # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
+    fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency 
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: After decode:")
+        pprint.pprint(fills)
+        print()
+
+    # Return fills
+    return fills
+
+# Merge order and fills
+def merge_order_fills(order, fills):
+
+    # Debug
+    debug = True
+    
+    # Merge fills into order
+    order['avgPrice']      = fills['avgPrice']
+    order['cumExecQty']    = fills['cumExecQty']
+    order['cumExecValue']  = fills['cumExecValue']
+    order['cumExecFee']    = fills['cumExecFee']
+    order['cumExecFeeCcy'] = fills['cumExecFeeCcy']
+    
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Merged order:")
+        pprint.pprint(order)
+        print()
+
+    # Return
+    return order    
 
 # Initialize active order for initial buy or sell
 def set_trigger(spot, active_order, info):
@@ -210,18 +296,18 @@ def check_sell(spot, profit, active_order, all_buys, use_pricelimit, pricelimit_
     pricelimit_advice = result[0]
     message           = result[1]
     
-    # Walk through buy database and find profitable buys
-    for transaction in all_buys:
+    # Walk through all_buys database and find profitable orders
+    for order in all_buys:
 
         # Only walk through closed buy orders
-        if transaction['status'] == 'Closed':
+        if order['status'] == 'Closed':
                     
-            # Check if a transaction is profitable
-            profitable_price = transaction['avgPrice'] * (1 + ((profit + distance) / 100))
+            # Check if a a buy order is profitable
+            profitable_price = order['avgPrice'] * (1 + ((profit + distance) / 100))
             nearest.append(profitable_price - spot)
             if spot >= profitable_price:
-                qty = qty + transaction['cumExecQty']
-                all_sells.append(transaction)
+                qty = qty + order['cumExecQty']
+                all_sells.append(order)
                 counter = counter + 1
     
     # Adjust quantity to exchange regulations
@@ -308,7 +394,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     active_order['orderid'] = int(order['data'][0]['algoId'])
 
     # Get order details from order we just placed
-    result     = get_order(active_order['orderid'], info)
+    result     = get_order(active_order['orderid'])
     order      = result[0]
     error_code = result[1]
     error_msg  = result[2]
@@ -342,7 +428,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     message = message + f"with order ID '{active_order['orderid']}'"
     defs.announce(message)
 
-    # Store the transaction in the database buys file
+    # Store the order in the database buys file
     all_buys = database.register_buy(order, all_buys, info)
     defs.announce(f"Registered buy order in database {config.dbase_file}")
 
@@ -407,7 +493,7 @@ def sell(spot, active_order, prices, info):
     active_order['orderid'] = int(order['data'][0]['algoId'])
 
     # Get order details
-    result     = get_order(active_order['orderid'], info)
+    result     = get_order(active_order['orderid'])
     order      = result[0]
     error_code = result[1]
     error_msg  = result[2]

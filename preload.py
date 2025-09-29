@@ -273,7 +273,7 @@ def check_files():
         os.makedirs(config.data_folder)
     
     # Headers for files
-    revenue_header = "UTCTime,createdTime,orderid,orderLinkId,side,symbol,baseCoin,quoteCoin,orderType,orderStatus,avgPrice,qty,triggerStart,triggerEnd,cumExecFee,cumExecQty,cumExecValue,revenue\n"
+    revenue_header = "UTCTime,createdTime,orderid,linkedid,side,symbol,baseCoin,quoteCoin,orderType,orderStatus,avgPrice,qty,triggerStart,triggerEnd,cumExecFee,cumExecQty,cumExecValue,revenue\n"
     
     # Does the buy orders database exist
     create_file(config.dbase_file)                      # Buy orders database
@@ -312,11 +312,11 @@ def check_orders(all_buys, info):
             message = f"Checking order from database with order ID '{order['orderid']}'"
             defs.announce(message)
 
-            # Check transaction
+            # Check order
             temp_order = order
             if order['status'] != "Closed":
                 defs.announce("Performing an additional check on order status via exchange")
-                result     = orders.get_order(order['orderid'], info)
+                result     = orders.get_order(order['orderid'])
                 temp_order = result[0]
                 error_code = result[1]
                 error_msg  = result[2]
@@ -334,7 +334,7 @@ def check_orders(all_buys, info):
             defs.announce(message)
             
             # Check order
-            result     = orders.get_order(order['orderid'], info)
+            result     = orders.get_order(order['orderid'])
             temp_order = result[0]
             error_code = result[1]
             error_msg  = result[2]

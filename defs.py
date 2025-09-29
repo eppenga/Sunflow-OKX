@@ -98,9 +98,9 @@ def check_spread(all_buys, spot, spread):
     min_price = spot * (1 - (spread / 100))
     max_price = spot * (1 + (spread / 100))
 
-    # Loop through the all buys
-    for transaction in all_buys:
-        avg_price = transaction["avgPrice"]
+    # Loop through the all_buys
+    for order in all_buys:
+        avg_price = order["avgPrice"]
         if (avg_price >= min_price) and (avg_price <= max_price):
              can_buy = False
              near = min(abs((avg_price / min_price * 100) - 100), abs((avg_price / max_price * 100) - 100))
@@ -214,7 +214,7 @@ def log_error(exception):
         halt_sunflow = True
 
 # Log revenue data
-def log_revenue(active_order, transaction, revenue, info, sides=True, extended=False):
+def log_revenue(active_order, order, revenue, info, sides=True, extended=False):
     
     # Debug
     debug = False
@@ -227,30 +227,30 @@ def log_revenue(active_order, transaction, revenue, info, sides=True, extended=F
     
     # Round two variables
     revenue                     = defs.round_number(revenue, info['quotePrecision'])
-    transaction['cumExecValue'] = defs.round_number(transaction['cumExecValue'], info['quotePrecision'])
+    order['cumExecValue'] = defs.round_number(order['cumExecValue'], info['quotePrecision'])
 
     # Check if we can log
-    if (not extended) and (not sides) and (transaction['side'] == "Buy"):
+    if (not extended) and (not sides) and (order['side'] == "Buy"):
         return
 
     # Format data for extended messaging
     if extended:
         timedis = "timestamp\n" + timestamp
         a_order = "active_order\n" + pprint.pformat(active_order)
-        t_order = "transaction\n" + pprint.pformat(transaction)
+        t_order = "order\n" + pprint.pformat(order)
         r_order = "revenue\n" + pprint.pformat(revenue)
         i_order = "info\n" + pprint.pformat(info)
         message = divider + timedis+ seperator + a_order + seperator + t_order + seperator + r_order + seperator + i_order
 
     # Format data for normal messaging
-    # UTC Time, createdTime, orderid, orderLinkId, side, symbol, baseCoin, quoteCoin, orderType, orderStatus, avgPrice, qty, trigger_ini, triggerPrice, cumExecFee, cumExecQty, cumExecValue, revenue
+    # UTC Time, createdTime, orderid, linkedid, side, symbol, baseCoin, quoteCoin, orderType, orderStatus, avgPrice, qty, trigger_ini, triggerPrice, cumExecFee, cumExecQty, cumExecValue, revenue
     if not extended:
-        message = f"{timestamp},{transaction['createdTime']},"
-        message = message + f"{transaction['orderid']},{transaction['orderLinkId']},"
-        message = message + f"{transaction['side']},{transaction['symbol']},{info['baseCoin']},{info['quoteCoin']},"
-        message = message + f"{transaction['orderType']},{transaction['orderStatus']},"
-        message = message + f"{transaction['avgPrice']},{transaction['qty']},{active_order['trigger_ini']},{transaction['triggerPrice']},"
-        message = message + f"{transaction['cumExecFee']},{transaction['cumExecQty']},{transaction['cumExecValue']},{revenue}"
+        message = f"{timestamp},{order['createdTime']},"
+        message = message + f"{order['orderid']},{order['linkedid']},"
+        message = message + f"{order['side']},{order['symbol']},{info['baseCoin']},{info['quoteCoin']},"
+        message = message + f"{order['orderType']},{order['orderStatus']},"
+        message = message + f"{order['avgPrice']},{order['qty']},{active_order['trigger_ini']},{order['triggerPrice']},"
+        message = message + f"{order['cumExecFee']},{order['cumExecQty']},{order['cumExecValue']},{revenue}"
     
     # Debug to stdout
     if debug:

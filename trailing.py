@@ -66,7 +66,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         stuck['check'] = True
         
         # Has trailing endend, check if order does still exist
-        result       = orders.get_order(active_order['orderid'], info)
+        result       = orders.get_order(active_order['orderid'])
         order        = result[0]
         error_code   = result[1]
         error_msg    = result[2]
@@ -98,14 +98,14 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
             active_order = result[0]
             all_buys     = result[1]
             all_sells    = result[2]
-            transaction  = result[3]
+            closed_order = result[3]
             revenue      = result[4]
         
             # Fill in average price and report message
             if active_order['side'] == "Buy":
-                message = message + f" and fill price {defs.format_number(transaction['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
+                message = message + f" and fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
             elif active_order['side'] == "Sell":
-                message = message + f", fill price {defs.format_number(transaction['avgPrice'], info['tickSize'])} {info['quoteCoin']} "
+                message = message + f", fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']} "
                 message = message + f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
             defs.announce(message)
            
@@ -118,7 +118,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
                 
             # Report to revenue log file
             if config.revenue_log:
-                defs.log_revenue(active_order, transaction, revenue, info, config.revenue_log_sides, config.revenue_log_full)
+                defs.log_revenue(active_order, closed_order, revenue, info, config.revenue_log_sides, config.revenue_log_full)
             
         # Check if symbol is spiking
         else:
@@ -180,7 +180,7 @@ def check_spike(spot, active_order, order, all_buys, info):
     return active_order, all_buys
 
 # Calculate revenue from sell
-def calculate_revenue(transaction, all_sells, spot, info):
+def calculate_revenue(order, all_sells, spot, info):
     
     # Debug and speed
     debug = False
@@ -197,10 +197,10 @@ def calculate_revenue(transaction, all_sells, spot, info):
     fees['total'] = 0
     
     # Logic
-    sells         = transaction['cumExecValue']
+    sells         = order['cumExecValue']
     buys          = sum(item['cumExecValue'] for item in all_sells)
     fees['buy']   = sum(item['cumExecFee'] for item in all_sells) * spot
-    fees['sell']  = transaction['cumExecFee']
+    fees['sell']  = order['cumExecFee']
     fees['total'] = fees['buy'] + fees['sell']
     revenue       = sells - buys - fees['total']
     
@@ -231,8 +231,8 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
     # Make active_order inactive
     active_order['active'] = False
     
-    # Close the order on either buy or sell trailing order
-    result     = orders.get_order(active_order['orderid'], info) 
+    # Get buy or sell order
+    result     = orders.get_order(active_order['orderid']) 
     order      = result[0]
     error_code = result[1]
     error_msg  = result[2]
@@ -242,8 +242,26 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
         message = f"*** Error: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
         return active_order, all_buys, all_sells, order, revenue
-       
+
+    # Get fills for the closed order
+    result     = orders.get_fills(active_order['linkedid'])
+    fills      = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
+
+    # Check fills for errors
+    if error_code != 0:
+        message = f"*** Error: Failed to get fills when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+        defs.log_error(message)
+        return active_order, all_buys, all_sells, order, revenue
+
+    # Glue order and fills together
+    order = orders.merge_order_fills(order,fills)
+
+    # Set Sunflow order status to Closed
     order['status'] = "Closed"
+
+    # Debug: Show order
     if debug:
         defs.announce(f"Debug: {active_order['side']} order")
         pprint.pprint(order)
