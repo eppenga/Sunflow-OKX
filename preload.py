@@ -239,9 +239,9 @@ def get_info(spot, multiplier, compounding):
     info['feeMaker']       = abs(float(rates['maker']))       # Maker fee
     info['feeTaker']       = abs(float(rates['taker']))       # Taker fee
 
-    # Calculate info['buyBase']
+    # Calculate info['buyBase'] and info['buyQuote']
     info = calc_info(info, spot, multiplier, compounding)
-    
+       
     # Debug to stdout
     if debug:
         defs.announce("Debug: Instrument info")

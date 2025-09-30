@@ -807,8 +807,7 @@ if config.wallet_report:
 # Preload compounding
 if compounding['enabled']:
     info = defs.calc_compounding(info, spot, compounding)
-
-
+    
 
 ## TESTS ##
 print("\n*** Preloading report ***")

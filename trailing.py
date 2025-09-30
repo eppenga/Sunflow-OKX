@@ -398,7 +398,7 @@ def aqs_helper(active_order, info, all_sells, all_sells_new):
     else:
 
         # Critical error, let's log it and revert
-        message = f"*** Warning: Critical failure while trailing! ***\n>>> Message: {error_msg}"
+        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_msg}"
         defs.log_error(message)
 
     # Return data
@@ -494,7 +494,7 @@ def atp_helper(active_order, all_buys, info):
     else:
 
         # Critical error, let's log it and revert
-        message = f"*** Warning: Critical failure while trailing! ***\n>>> Message: {error_msg}"
+        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_msg}"
         defs.log_error(message)
     
     # Return active_order
