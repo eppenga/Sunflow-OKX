@@ -183,7 +183,7 @@ def log_error(exception):
     call_frame     = stack[1]
     filename       = Path(call_frame.filename).name
     functionname   = call_frame.function
-    timestamp      = now_utc()[1]
+    timestamp      = now_utc()[6]
 
     # Safeguard from type errors
     exception = str(exception)
@@ -226,7 +226,7 @@ def log_revenue(active_order, order, revenue, info, sides=True, extended=False):
     timestamp = defs.now_utc()[0]
     
     # Round two variables
-    revenue                     = defs.round_number(revenue, info['quotePrecision'])
+    revenue               = defs.round_number(revenue, info['quotePrecision'])
     order['cumExecValue'] = defs.round_number(order['cumExecValue'], info['quotePrecision'])
 
     # Check if we can log
@@ -243,14 +243,14 @@ def log_revenue(active_order, order, revenue, info, sides=True, extended=False):
         message = divider + timedis+ seperator + a_order + seperator + t_order + seperator + r_order + seperator + i_order
 
     # Format data for normal messaging
-    # UTC Time, createdTime, orderid, linkedid, side, symbol, baseCoin, quoteCoin, orderType, orderStatus, avgPrice, qty, trigger_ini, triggerPrice, cumExecFee, cumExecQty, cumExecValue, revenue
+    # UTC Time, createdTime, orderid, linkedid, side, symbol, baseCoin, quoteCoin, orderType, orderStatus, avgPrice, qty, trigger_ini, triggerPrice, cumExecFeeCcy, cumExecFee, cumExecQty, cumExecValue, revenue
     if not extended:
         message = f"{timestamp},{order['createdTime']},"
         message = message + f"{order['orderid']},{order['linkedid']},"
         message = message + f"{order['side']},{order['symbol']},{info['baseCoin']},{info['quoteCoin']},"
         message = message + f"{order['orderType']},{order['orderStatus']},"
         message = message + f"{order['avgPrice']},{order['qty']},{active_order['trigger_ini']},{order['triggerPrice']},"
-        message = message + f"{order['cumExecFee']},{order['cumExecQty']},{order['cumExecValue']},{revenue}"
+        message = message + f"{order['cumExecFeeCcy']},{order['cumExecFee']},{order['cumExecQty']},{order['cumExecValue']},{revenue}"
     
     # Debug to stdout
     if debug:

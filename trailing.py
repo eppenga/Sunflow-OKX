@@ -185,7 +185,7 @@ def check_spike(spot, active_order, order, all_buys, info):
 def calculate_revenue(order, all_sells, spot, info):
     
     # Debug and speed
-    debug = False
+    debug = True
     speed = True
     stime = defs.now_utc()[4]
     
@@ -223,7 +223,7 @@ def calculate_revenue(order, all_sells, spot, info):
 def close_trail(active_order, all_buys, all_sells, spot, info):
 
     # Debug and speed
-    debug = True
+    debug = False
     speed = True
     stime = defs.now_utc()[4]
     

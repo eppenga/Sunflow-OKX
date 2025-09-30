@@ -273,7 +273,7 @@ def check_files():
         os.makedirs(config.data_folder)
     
     # Headers for files
-    revenue_header = "UTCTime,createdTime,orderid,linkedid,side,symbol,baseCoin,quoteCoin,orderType,orderStatus,avgPrice,qty,triggerStart,triggerEnd,cumExecFee,cumExecQty,cumExecValue,revenue\n"
+    revenue_header = "UTCTime,createdTime,orderid,linkedid,side,symbol,baseCoin,quoteCoin,orderType,orderStatus,avgPrice,qty,triggerStart,triggerEnd,cumExecFeeCcy,cumExecFee,cumExecQty,cumExecValue,revenue\n"
     
     # Does the buy orders database exist
     create_file(config.dbase_file)                      # Buy orders database

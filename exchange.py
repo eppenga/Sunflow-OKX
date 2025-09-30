@@ -466,7 +466,7 @@ def get_order(orderid):
 def get_fills(orderid):
 
     # Debug
-    debug = True
+    debug = False
     
     # Initialize variables
     response    = {}
@@ -510,7 +510,7 @@ def get_fills(orderid):
     # Return data
     return response, error_code, error_msg
 
-# Cancel order
+# Cancel order, WARNING WORKAROUND SINCE CANCEL_ALGO_ORDER DOES NOT WORK!
 def cancel_order(orderid):
     
     # Debug
@@ -524,11 +524,13 @@ def cancel_order(orderid):
 
     # Get reponse
     for attempt in range(2):
-        message = defs.announce("session: tradeAPI.cancel_algo_order()")
+        message = defs.announce("session: tradeAPI.amend_algo_order()")
         try:
-            response   = tradeAPI.cancel_algo_order(
-                instId = config.symbol,
-                algoId = str(orderid)
+            response           = tradeAPI.amend_algo_order(
+                instId         = config.symbol,
+                algoId         = str(orderid),
+                newSlTriggerPx = '0',
+                cxlOnFail      = True
             )
         except Exception as e:
             message = f"*** Error: Failed to cancel order {orderid} ***\n>>> Message: {e}"
@@ -542,6 +544,11 @@ def cancel_order(orderid):
         result     = check_response(response)
         error_code = result[4]
         error_msg  = result[5]
+
+        # WORKAROUND FOR BROKEN CANCEL_ALGO_ORDERS
+        if error_code == 51527:
+            error_code = 0
+            error_msg  = ""
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
