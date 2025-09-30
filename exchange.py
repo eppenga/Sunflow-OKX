@@ -72,7 +72,7 @@ def check_response(response):
         error_code = sCode
         error_msg  = sMsg
     
-    debug = True
+    # Debug to stdout
     if debug:
         defs.announce("Response codes and messages:")
         print(f"code: {code}", f"\nmsg: {msg}", f"\nsCode: {sCode}", f"\nsMsg: {sMsg}", f"\nerror_code: {error_code}", f"\nerror_msg: {error_msg}\n")
@@ -563,11 +563,8 @@ def cancel_order(orderid):
 
         # WORKAROUND FOR BROKEN CANCEL_ALGO_ORDERS
         if error_code in (51527, 51543):
-            defs.announce("I was here and error code was captured")
             error_code = 0
             error_msg  = ""
-
-        defs.announce(f"Just before leaving cancel_order error_code {error_code}")
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])

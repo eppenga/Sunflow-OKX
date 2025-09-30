@@ -100,7 +100,7 @@ def remove(active_order, all_buys, info):
         all_buys = orders.rebalance(all_buys, info)
     
     # Return
-    active_order, all_buys, error_code, error_msg
+    return active_order, all_buys, error_code, error_msg
 
 # Remove an order from the all buys database file
 def remove_buy(orderid, all_buys, info):
