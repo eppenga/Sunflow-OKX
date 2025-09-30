@@ -538,7 +538,7 @@ def get_balance(currency):
     stime = defs.now_utc()[4]
 
     # Initialize variables
-    balance    = {}
+    balance    = 0
     response   = {}
     result     = ()
     error_code = 0
@@ -553,9 +553,16 @@ def get_balance(currency):
         message = f"*** Error: Failed to get balance for {currency}! ***"
         defs.log_error(message)
         return balance, error_code, error_msg
+
+    pprint.pprint(response)
        
     # Decode response to balance
-    balance = float(response['data'][0]['details'][0]['eq'])
+    try:
+        details = response.get("data", [])[0].get("details", [])
+        if details and "eq" in details[0]:
+            balance = float(details[0].get("eq") or 0)
+    except (IndexError, ValueError, TypeError):
+        pass
 
     # Debug to stdout
     if debug:
