@@ -324,7 +324,7 @@ def handle_ticker(message):
                     
                 else:
                     # Something went very wrong
-                    message = f"*** Error: Failed to cancel order ***\n>>> Message: {error_code} - {error_msg}\n>>> Response: {response}"
+                    message = f"*** Error: Failed to cancel order while trailing ***\n>>> Message: {error_code} - {error_msg}\n>>> Response: {response}"
                     defs.log_error(message)
                 
             # Initiate sell
@@ -874,7 +874,7 @@ def ping_message(current_time):
     
     # Check for to little action
     if delay_tickers > expire:
-        message = f"*** Error S0015: Ping, last ticker update of {delay_tickers} ms ago is larger than {expire} ms maximum! ***"
+        message = f"*** Error: Ping, last ticker update of {delay_tickers} ms ago is larger than {expire} ms maximum! ***"
         defs.log_error(message)
 
     # Report to stdout

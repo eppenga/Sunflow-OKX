@@ -17,6 +17,11 @@ stuck             = {}
 stuck['check']    = True
 stuck['time']     = defs.now_utc()[4]
 stuck['interval'] = config.stuck_interval
+
+# Initialize order recheck variable
+recheck            = {}
+recheck['count']   = 0
+recheck['maximum'] = 3
    
 # Check if we can do trailing buy or sell
 def check_order(spot, compounding, active_order, all_buys, all_sells, info):
@@ -26,8 +31,8 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     speed = False
     stime = defs.now_utc()[4]
     
-    # Declare stuck variable global
-    global stuck
+    # Declare some variables global
+    global stuck, recheck
     
     # Initialize variables
     result         = ()
@@ -46,7 +51,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
             type_check     = "a regular"
             do_check_order = True
 
-    # Check every interval, sometimes orders get stuck
+    # Check periodically, sometimes orders get stuck
     current_time = defs.now_utc()[4]
     if stuck['check']:
         stuck['check'] = False
@@ -55,7 +60,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         type_check = "an additional"
         do_check_order = True
 
-    # Current price crossed trigger price
+    # Current price crossed trigger price or periodic check
     if do_check_order:
 
         # Report to stdout
@@ -70,25 +75,14 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         order        = result[0]
         error_code   = result[1]
         error_msg    = result[2]
-        
-        # Check for errors in trailing order
         if error_code != 0:
-            
-            # Reset active_order
-            active_order['active'] = False
-            
-            # Remove from database when buying
-            if active_order['side'] == "Buy":
-                all_buys = database.remove_buy(active_order['orderid'], all_buys, info)
-            
-            # Report to stdout
-            message = f"*** Warning: Something wrong with trailing order ***\n>>> Message: {error_code} - {error_msg}"
+            message = f"*** Error: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
             
         # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process
         if order['orderStatus'] == "Effective":
             
-            # Prepare message for stdout and Apprise
+            # Prepare message for stdout
             defs.announce(f"Trailing {active_order['side'].lower()}: *** Order has been filled! ***")
             message = f"{active_order['side']} order closed for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
             message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
@@ -202,7 +196,9 @@ def calculate_revenue(order, all_sells, spot, info):
     sells         = order['cumExecValue']
     buys          = sum(item['cumExecValue'] for item in all_sells)
     fees['buy']   = sum(item['cumExecFee'] for item in all_sells) * spot
+    fees['buy']   = defs.round_number(fees['buy'], info['quotePrecision'], "down")
     fees['sell']  = order['cumExecFee']
+    fees['sell']  = defs.round_number(fees['sell'], info['basePrecision'], "down")
     fees['total'] = fees['buy'] + fees['sell']
     revenue       = sells - buys - fees['total']
     
@@ -481,8 +477,8 @@ def atp_helper(active_order, all_buys, info):
 
     elif error_code == 51280:
     
-        # Order went up to fast, reset and replace
-        message = f"*** Warning: Probably price went up to fast probably while selling, trailing cancelled ***\n>>> Message: {error_code} - {error_msg}"
+        # Order went up to fast, SL order couldnt keep up, reset and replace
+        message = f"*** Warning: Order couldn't keep up, trailing cancelled ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
 
         # Try to remove order

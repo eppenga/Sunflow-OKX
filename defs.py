@@ -608,7 +608,7 @@ def calc_compounding(info, spot, compounding):
     # Return
     return info
 
-# Send out a notification via stdout or Apprise
+# Send out a notification via stdout
 def announce(message):
    
     # Initialize variables

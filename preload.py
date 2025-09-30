@@ -93,7 +93,7 @@ def get_klines(interval, limit):
     # Check response from exchange
     amount_klines = len(klines['time'])
     if amount_klines != limit:
-        message = f"*** Error S0009: Tried to load {limit} klines, but exchange only provided {amount_klines} ***"
+        message = f"*** Error: Tried to load {limit} klines, but exchange only provided {amount_klines} ***"
         defs.log_error(message)
       
     # Report to stdout

@@ -53,7 +53,7 @@ def get_order(orderid):
     return order, error_code, error_msg
 
 # Get order fills
-def get_fills(orderid):
+def get_fills(linkedid):
 
     # Debug and speed
     debug = False
@@ -68,7 +68,7 @@ def get_fills(orderid):
     error_msg  = ""
 
     # Get response from exchange
-    result     = exchange.get_fills(orderid)
+    result     = exchange.get_fills(linkedid)
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
@@ -100,9 +100,8 @@ def cancel_order(orderid):
     speed = True
     stime = defs.now_utc()[4]
 
-    # Debug to stdout
-    if debug:
-        defs.announce(f"Debug: Trying to cancel order with order ID {orderid}")
+    # Report to stdout
+    defs.announce(f"Trying to cancel order {orderid}")
     
     # Initialize variables
     response   = {}
@@ -152,8 +151,8 @@ def decode_order(response):
     order['triggerPrice']  = float(result.get('slTriggerPx'))               # Trigger price in quote (USDT)
     order['avgPrice']      = 0                                              # Average fill price in quote (USDT)
     order['cumExecQty']    = 0                                              # Cumulative executed quantity in base (BTC)
-    order['cumExecValue']  = 0                                              # Cumulative executed value (USDT)
-    order['cumExecFee']    = 0                                              # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
+    order['cumExecValue']  = 0                                              # Cumulative executed value in quote (USDT)
+    order['cumExecFee']    = 0                                              # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
     order['cumExecFeeCcy'] = ''                                             # Cumulative executed fee currency 
 
     # Debug to stdout
@@ -169,7 +168,7 @@ def decode_order(response):
 def decode_fills(response):
     
     # Debug
-    debug = False
+    debug = True
     
     # Debug to stdout
     if debug:
@@ -184,8 +183,8 @@ def decode_fills(response):
     # Map fills to response
     fills['avgPrice']      = float(result['fillPx'])                        # Average fill price in quote (USDT)
     fills['cumExecQty']    = float(result['fillSz'])                        # Cumulative executed quantity in base (BTC)
-    fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value (USDT)
-    fills['cumExecFee']    = float(result['fee']) * -1                      # Cumulative executed fee in ?? () voor een buy is het in base *** CHECK ***
+    fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value in quote (USDT)
+    fills['cumExecFee']    = float(result['fee']) * -1                      # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
     fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency 
 
     # Debug to stdout
@@ -205,7 +204,7 @@ def merge_order_fills(order, fills, info):
     
     # Merge fills into order
     order['avgPrice']      = fills['avgPrice']
-    order['cumExecQty']    = fills['cumExecQty']
+    order['cumExecQty']    = defs.round_number(fills['cumExecQty'], info['basePrecision'], "down")
     order['cumExecValue']  = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")   
     order['cumExecFee']    = fills['cumExecFee']
     order['cumExecFeeCcy'] = fills['cumExecFeeCcy']

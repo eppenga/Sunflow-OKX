@@ -72,9 +72,10 @@ def check_response(response):
         error_code = sCode
         error_msg  = sMsg
     
+    debug = True
     if debug:
         defs.announce("Response codes and messages:")
-        print(f"code: {code}", f"\nmsg: {msg}", f"\nsCode: {sCode}", f"\nsMsg: {sMsg}\n")
+        print(f"code: {code}", f"\nmsg: {msg}", f"\nsCode: {sCode}", f"\nsMsg: {sMsg}", f"\nerror_code: {error_code}", f"\nerror_msg: {error_msg}\n")
 
     # Return
     return code, msg, sCode, sMsg, error_code, error_msg
@@ -426,6 +427,7 @@ def get_order(orderid):
     error_code = 0
     error_msg  = ""
     rate_limit = False
+    recheck    = False
 
     # Get reponse
     for attempt in range(2):
@@ -446,12 +448,18 @@ def get_order(orderid):
         result     = check_response(response)
         error_code = result[4]
         error_msg  = result[5]
+        
+        # Check if error does not yet exist, sometimes it is delayed
+        if error_code == 51603: 
+            recheck = True
+            defs.log_error(f"Warning: Rechecking error, maybe it's delayed, attempt {attempt + 1} / 3")
+            time.sleep(1)
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
         
         # Break out of loop
-        if not rate_limit: break
+        if not rate_limit and not recheck: break
 
     # Debug to stdout
     if debug:
@@ -473,6 +481,7 @@ def get_fills(orderid):
     error_code = 0
     error_msg  = ""
     rate_limit = False
+    recheck    = False
 
     # Get reponse
     for attempt in range(2):    
@@ -494,6 +503,13 @@ def get_fills(orderid):
         result     = check_response(response)
         error_code = result[4]
         error_msg  = result[5]
+
+        # Check if fills are already present, it's sometimes delayed
+        response = {'code': '0', 'data': [], 'msg': ''}
+        if (response['code'] == '0') and (response['data'] == []): 
+            recheck = True
+            defs.log_error(f"Warning: Rechecking fills, maybe it's delayed, attempt {attempt + 1} / 3")
+            time.sleep(1)
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
@@ -546,9 +562,12 @@ def cancel_order(orderid):
         error_msg  = result[5]
 
         # WORKAROUND FOR BROKEN CANCEL_ALGO_ORDERS
-        if error_code == 51527:
+        if error_code in (51527, 51543):
+            defs.announce("I was here and error code was captured")
             error_code = 0
             error_msg  = ""
+
+        defs.announce(f"Just before leaving cancel_order error_code {error_code}")
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
