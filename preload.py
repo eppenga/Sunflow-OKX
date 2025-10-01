@@ -309,7 +309,7 @@ def check_orders(all_buys, info):
         if quick:
 
             # Only check order on exchange if status is not Closed
-            message = f"Checking order from database with order ID '{order['orderid']}'"
+            message = f"Checking order {order['orderid']} in database"
             defs.announce(message)
 
             # Check order
@@ -328,7 +328,7 @@ def check_orders(all_buys, info):
         else:
 
             # Check all order on exchange regardless of status
-            message = f"Checking order on exchange: '{order['orderid']}'"
+            message = f"Checking order {order['orderid']} at exchange"
             defs.announce(message)
             
             # Check order

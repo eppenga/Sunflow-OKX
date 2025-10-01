@@ -183,13 +183,14 @@ def log_error(exception):
     call_frame     = stack[1]
     filename       = Path(call_frame.filename).name
     functionname   = call_frame.function
+    line           = call_frame.lineno
     timestamp      = now_utc()[6]
 
     # Safeguard from type errors
     exception = str(exception)
 
     # Create message
-    message = timestamp + f"{filename}: {functionname}: {exception}"
+    message = timestamp + f"{filename}: {functionname}: {line}: {exception}"
 
     # Just a warning
     if "Warning" in exception:
@@ -205,7 +206,7 @@ def log_error(exception):
         file.write(message + "\n\n")
     
     # Report to stdout
-    defs.announce(f"{exception} | File: {filename} | Function: {functionname}")
+    defs.announce(f"{exception}\n>>> File: {filename} | Function: {functionname} | Line: {line}")
     
     # Terminate hard
     if halt_execution:

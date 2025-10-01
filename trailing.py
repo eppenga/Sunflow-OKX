@@ -388,17 +388,11 @@ def aqs_helper(active_order, info, all_sells, all_sells_new):
         message  = f"Adjusted quantity from {defs.format_number(active_order['qty'], info['basePrecision'])} "
         message += f"to {defs.format_number(active_order['qty_new'], info['basePrecision'])} {info['baseCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
-
-    elif error_code == 51503: # (51503 = Your order has already been filled or canceled) *** CHECK *** Might be 51603 instead!
-
-        # Order does not exist, trailing order was sold in between
-        all_sells_new = all_sells
-        defs.announce("Adjusting trigger quantity not possible, sell order already hit")
-        
+       
     else:
 
-        # Critical error, let's log it and revert
-        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_msg}"
+        # Critical error, log and exit
+        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
     # Return data
@@ -470,14 +464,11 @@ def atp_helper(active_order, all_buys, info):
         message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
 
-    elif error_code == 51503: # (51503 = Your order has already been filled or canceled) *** CHECK *** Might be 51603 instead!
-
-        # Order does not exist, trailing order sold or bought in between
-        defs.announce(f"Adjusting trigger price not possible, {active_order['side'].lower()} order already hit")
-
-    elif error_code == 51280:
+    elif (error_code == 51280) or (error_code == 51278):
     
         # Order went up to fast, SL order couldnt keep up, reset and replace
+        # error_code = 51280 - SL trigger price must be less than the last price
+        # error_code = 51278 - SL trigger price cannot be lower than the last price
         message = f"*** Warning: Order couldn't keep up, trailing cancelled ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
 
@@ -493,8 +484,8 @@ def atp_helper(active_order, all_buys, info):
     
     else:
 
-        # Critical error, let's log it and revert
-        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_msg}"
+        # Critical error, log and exit
+        message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
     
     # Return active_order

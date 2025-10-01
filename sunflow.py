@@ -324,7 +324,7 @@ def handle_ticker(message):
                     
                 else:
                     # Something went very wrong
-                    message = f"*** Error: Failed to cancel order while trailing ***\n>>> Message: {error_code} - {error_msg}\n>>> Response: {response}"
+                    message = f"*** Error: Failed to cancel order while trailing ***\n>>> Message: {error_code} - {error_msg}"
                     defs.log_error(message)
                 
             # Initiate sell

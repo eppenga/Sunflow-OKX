@@ -23,7 +23,7 @@ tradeAPI      = Trade.TradeAPI(config.api_key, config.api_secret, config.api_pas
 accountAPI    = Account.AccountAPI(config.api_key, config.api_secret, config.api_passphrase, False, config.api_env, config.api_site)
 
 # Check the response of a request
-def check_response(response):
+def check_response(response, silent=False):
     
     # Debug
     debug = False
@@ -61,9 +61,10 @@ def check_response(response):
         defs.log_error(message)   
 
     # Check for errors in request
-    if code !=0 or sCode !=0:
-        message = f"*** Warning: Failure in request, code is {code}, sCode is {sCode} ***\n>>> msg: {msg}\n>>> sMsg: {sMsg}"
-        defs.log_error(message)
+    if not silent:
+        if code !=0 or sCode !=0:
+            message = f"*** Warning: Failure in request to exchange ***\n>>> Message 1: {code} - {msg}\n>>> Message 2: {sCode} - {sMsg}"
+            defs.log_error(message)
     
     # Set error_code and error_msg
     error_code = code
@@ -455,9 +456,11 @@ def get_order(orderid):
 
         # Check response for errors
         if validate:
-            result     = check_response(response)
-            error_code = result[4]
-            error_msg  = result[5]
+            result = check_response(response)
+        else:
+            result = check_response(response, True)
+        error_code = result[4]
+        error_msg  = result[5]
         
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
@@ -520,9 +523,11 @@ def get_fills(orderid):
 
         # Check response for errors
         if validate:
-            result     = check_response(response)
-            error_code = result[4]
-            error_msg  = result[5]
+            result = check_response(response)
+        else:
+            result = check_response(response, True)
+        error_code = result[4]
+        error_msg  = result[5]
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
