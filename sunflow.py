@@ -263,7 +263,7 @@ def handle_ticker(message):
             all_buys     = result[1]
             compounding  = result[2]
             info         = result[3]
-         
+        
         # Has price changed, then run all kinds of actions
         if spot != ticker['lastPrice']:
 
@@ -343,6 +343,7 @@ def handle_ticker(message):
                 if active_order['qty_new'] != active_order['qty'] and active_order['qty_new'] > 0:
 
                     # Amend order quantity
+                    pprint.pprint(active_order)
                     result        = trailing.aqs_helper(active_order, info, all_sells, all_sells_new)
                     active_order  = result[0]
                     all_sells     = result[1]

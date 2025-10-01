@@ -422,9 +422,8 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
         print()
 
     # Report to stdout
-    message = f"Buy order opened for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
-    message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']} "
-    message = message + f"with order ID '{active_order['orderid']}'"
+    message = f"Buy order {active_order['orderid']} opened for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
+    message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
     defs.announce(message)
 
     # Store the order in the database buys file
@@ -518,9 +517,8 @@ def sell(spot, active_order, prices, info):
         print()
     
     # Report to stdout
-    message = f"Sell order opened for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
-    message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']} "
-    message = message + f"with order ID '{active_order['orderid']}'"
+    message = f"Sell order {active_order['orderid']} opened for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
+    message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
     defs.announce(message)
 
     # Report execution time

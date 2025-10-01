@@ -64,7 +64,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     if do_check_order:
 
         # Report to stdout
-        message = f"Performing {type_check} check on {active_order['side'].lower()} order '{active_order['orderid']}'"
+        message = f"Performing {type_check} check on {active_order['side'].lower()} order {active_order['orderid']}'"
         defs.announce(message)
 
         # Check stuck next time
@@ -383,11 +383,11 @@ def aqs_helper(active_order, info, all_sells, all_sells_new):
     if error_code == 0:
 
         # Everything went fine, we can continue trailing
-        all_sells = all_sells_new
         active_order['qty'] = active_order['qty_new']
         message  = f"Adjusted quantity from {defs.format_number(active_order['qty'], info['basePrecision'])} "
         message += f"to {defs.format_number(active_order['qty_new'], info['basePrecision'])} {info['baseCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
+        all_sells = all_sells_new
        
     else:
 
@@ -459,10 +459,10 @@ def atp_helper(active_order, all_buys, info):
     if error_code == 0:
 
         # Everything went fine, we can continue trailing
-        active_order['trigger'] = active_order['trigger_new']
         message  = f"Adjusted trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
         message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
+        active_order['trigger'] = active_order['trigger_new']        
 
     elif (error_code == 51280) or (error_code == 51278):
     

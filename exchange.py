@@ -59,13 +59,7 @@ def check_response(response, silent=False):
     if error:
         message = "**** Error: Response of exchange request malformed ***"
         defs.log_error(message)   
-
-    # Check for errors in request
-    if not silent:
-        if code !=0 or sCode !=0:
-            message = f"*** Warning: Failure in request to exchange ***\n>>> Message 1: {code} - {msg}\n>>> Message 2: {sCode} - {sMsg}"
-            defs.log_error(message)
-    
+   
     # Set error_code and error_msg
     error_code = code
     error_msg  = msg
@@ -429,7 +423,6 @@ def get_order(orderid):
     error_msg  = ""
     rate_limit = False
     recheck    = False
-    validate   = True
 
     # Get reponse
     defs.announce(f"Trying to get details for order {orderid}")	
@@ -447,21 +440,17 @@ def get_order(orderid):
         if config.exchange_log:
             defs.log_exchange(response, message)
 
+        # Check response for errors
+        result = check_response(response, True)
+        error_code = result[4]
+        error_msg  = result[5]
+
         # Check if error does not yet exist, sometimes it is delayed
         if error_code == 51603: 
             recheck  = True
-            validate = False
-            defs.log_error(f"Warning: Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 5")
+            defs.announce(f"Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
-
-        # Check response for errors
-        if validate:
-            result = check_response(response)
-        else:
-            result = check_response(response, True)
-        error_code = result[4]
-        error_msg  = result[5]
-        
+       
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
         
@@ -495,7 +484,6 @@ def get_fills(orderid):
     error_msg  = ""
     rate_limit = False
     recheck    = False
-    validate   = True
 
     # Get reponse
     defs.announce(f"Trying to get fills for order {orderid}")
@@ -514,20 +502,16 @@ def get_fills(orderid):
         if config.exchange_log:
             defs.log_exchange(response, message)
 
+        # Check response for errors
+        result = check_response(response, True)
+        error_code = result[4]
+        error_msg  = result[5]
+
         # Check if fills are already present, it's sometimes delayed
         if (response['code'] == '0') and (response['data'] == []): 
             recheck = True
-            validate = False
-            defs.log_error(f"Warning: Rechecking get_fills(), maybe it's delayed, attempt {attempt + 1} / 5")
+            defs.announce(f"Rechecking get_fills(), maybe it's delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
-
-        # Check response for errors
-        if validate:
-            result = check_response(response)
-        else:
-            result = check_response(response, True)
-        error_code = result[4]
-        error_msg  = result[5]
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])

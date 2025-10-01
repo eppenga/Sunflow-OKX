@@ -190,7 +190,7 @@ def log_error(exception):
     exception = str(exception)
 
     # Create message
-    message = timestamp + f"{filename}: {functionname}: {line}: {exception}"
+    message = timestamp + f"{filename}: {functionname} ({line}): {exception}"
 
     # Just a warning
     if "Warning" in exception:
