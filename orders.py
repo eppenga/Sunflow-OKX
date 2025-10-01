@@ -623,7 +623,7 @@ def rebalance(all_buys, info):
         highest_avg_price_item = max(all_buys, key=lambda x: x['avgPrice'])
 
         # Remove this item from the list
-        all_buys.remove_buy(highest_avg_price_item)
+        all_buys = database.remove_buy(highest_avg_price_item['orderid'], all_buys, info)
         
         # Recalculate all buys
         equity_dbase = sum(order['cumExecQty'] for order in all_buys)    

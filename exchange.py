@@ -427,6 +427,12 @@ def get_order(orderid):
     # Get reponse
     defs.announce(f"Trying to get details for order {orderid}")	
     for attempt in range(5):
+        
+        # Set checks
+        rate_limit = False
+        recheck    = False
+        
+        # Query exchange
         message = defs.announce("session: tradeAPI.get_algo_order_details()")
         try:
             response   = tradeAPI.get_algo_order_details(
@@ -445,17 +451,17 @@ def get_order(orderid):
         error_code = result[4]
         error_msg  = result[5]
 
-        # Check if error does not yet exist, sometimes it is delayed
+        # Check if order does not yet exist, it's sometimes delayed
         if error_code == 51603: 
-            recheck  = True
+            recheck = True
             defs.announce(f"Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
        
-        # Check API rate limit
+        # Check API rate limit, if hit then True
         rate_limit = check_limit(result[0], result[2])
         
         # Break out of loop
-        if not rate_limit and not recheck: break
+        if (not rate_limit) and (not recheck): break
 
 	# Announce success
     if not rate_limit and not recheck:
@@ -487,7 +493,13 @@ def get_fills(orderid):
 
     # Get reponse
     defs.announce(f"Trying to get fills for order {orderid}")
-    for attempt in range(5):    
+    for attempt in range(5):
+        
+        # Set checks
+        rate_limit = False
+        recheck    = False
+        
+        # Query exchange
         message = defs.announce("session: tradeAPI.get_fills()")
         try:
             response = tradeAPI.get_fills(
@@ -507,17 +519,17 @@ def get_fills(orderid):
         error_code = result[4]
         error_msg  = result[5]
 
-        # Check if fills are already present, it's sometimes delayed
+        # Check if fills are already present, they're sometimes delayed
         if (response['code'] == '0') and (response['data'] == []): 
             recheck = True
-            defs.announce(f"Rechecking get_fills(), maybe it's delayed, attempt {attempt + 1} / 5")
+            defs.announce(f"Rechecking get_fills(), maybe they're delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
 
-        # Check API rate limit
+        # Check API rate limit, if hit then True
         rate_limit = check_limit(result[0], result[2])
         
         # Break out of loop
-        if not rate_limit and not recheck: break
+        if (not rate_limit) and (not recheck): break
 
 	# Announce success
     if not rate_limit and not recheck:

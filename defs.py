@@ -332,7 +332,7 @@ def advice_buy(indicators_advice, orderbook_advice, trade_advice, pricelimit_adv
         orderbook_advice['result'] = True
 
 
-    ''' Check ORDERBOOK for buy decission '''
+    ''' Check TRADE for buy decission '''
     
     if use_trade['enabled']:
         if (trade_advice['buy_ratio'] >= use_trade['minimum']) and (trade_advice['buy_ratio'] <= use_trade['maximum']):
@@ -344,13 +344,20 @@ def advice_buy(indicators_advice, orderbook_advice, trade_advice, pricelimit_adv
         trade_advice['result'] = True
 
 
-    ''' Check ORDERBOOK for buy decission '''
+    ''' Check PRICELIMIT for buy decission '''
 
     if use_pricelimit['enabled']:
+        # Default result
+        pricelimit_advice['buy_result'] = True  
+
+        # Apply min buy check
+        if use_pricelimit['min_buy_enabled']:
+            if spot < use_pricelimit['min_buy']:
+                pricelimit_advice['buy_result'] = False
+
+        # Apply max buy check
         if use_pricelimit['max_buy_enabled']:
-            if spot < use_pricelimit['max_buy']:
-                pricelimit_advice['buy_result'] = True
-            else:
+            if spot > use_pricelimit['max_buy']:
                 pricelimit_advice['buy_result'] = False
     else:
         # If pricelimit is not enabled, always true
