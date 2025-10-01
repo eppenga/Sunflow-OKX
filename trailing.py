@@ -103,10 +103,10 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
                 message = message + f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
             defs.announce(message)
            
-            # Report wallet, quote and base currency to stdout and adjust compounding
-            compounding['now'] = orders.report_wallet(spot, all_buys, info)[0]
+            # Report balances and adjust compounding
+            compounding['now'] = orders.report_balances(spot, all_buys, info)[0]
                             
-            # Report compounding, only possible when wallet reporting is active, see config file
+            # Report compounding, only possible when balance reporting is active, see config file
             if compounding['enabled']:
                 info = defs.calc_compounding(info, spot, compounding)
                 

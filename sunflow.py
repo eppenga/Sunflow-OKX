@@ -731,9 +731,9 @@ def prechecks():
         goahead = False
         defs.announce("Need at least either Technical Indicators enabled or Spread to determine buy action!")
     
-    if compounding['enabled'] and not config.wallet_report:
+    if compounding['enabled'] and not config.balance_report:
         goahead = False
-        defs.announce("When compounding set wallet_report to True to use compounding!")
+        defs.announce("When compounding set balance_report to True!")
     
     # Return result
     return goahead
@@ -799,10 +799,10 @@ if optimizer['enabled']:
 if config.database_rebalance:
     all_buys = orders.rebalance(all_buys, info)
 
-# Preload wallet, quote and base currency to stdout
-if config.wallet_report:
-    wallet_data        = orders.report_wallet(spot, all_buys, info)
-    compounding['now'] = wallet_data[0]
+# Preload balances
+if config.balance_report:
+    balances           = orders.report_balances(spot, all_buys, info)
+    compounding['now'] = balances[0]
 
 # Preload compounding
 if compounding['enabled']:
@@ -826,13 +826,13 @@ pprint.pprint(info)
 #print("\n** Klines **")
 #pprint.pprint(klines)
 
-if config.wallet_report:
+if config.balance_report:
     print("\n** Value **")
-    print(f"Total bot value : {wallet_data[0]} {info['quoteCoin']}")
-    print(f"Quote (exchange): {wallet_data[2]} {info['quoteCoin']}")
-    print(f"Base (exchange) : {wallet_data[1]} {info['baseCoin']}")
-    print(f"Base (database) : {wallet_data[3]} {info['baseCoin']}")
-    print(f"Out of sync     : {wallet_data[4]} {info['baseCoin']}")
+    print(f"Total bot value : {balances[0]} {info['quoteCoin']}")
+    print(f"Quote (exchange): {balances[2]} {info['quoteCoin']}")
+    print(f"Base (exchange) : {balances[1]} {info['baseCoin']}")
+    print(f"Base (database) : {balances[3]} {info['baseCoin']}")
+    print(f"Out of sync     : {balances[4]} {info['baseCoin']}")
 
 ## Announce start
 print("\n*** Starting ***\n")

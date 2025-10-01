@@ -428,38 +428,48 @@ def get_order(orderid):
     error_msg  = ""
     rate_limit = False
     recheck    = False
+    validate   = True
 
     # Get reponse
-    for attempt in range(2):
+    defs.announce(f"Trying to get details for order {orderid}")	
+    for attempt in range(5):
         message = defs.announce("session: tradeAPI.get_algo_order_details()")
         try:
             response   = tradeAPI.get_algo_order_details(
                 algoId = str(orderid)
             )
         except Exception as e:
-            message = f"*** Error: Failed to get information on order {orderid} ***\n>>> Message: {e}"
+            message = f"*** Error: Failed to get details on order {orderid} ***\n>>> Message: {e}"
             defs.log_error(message)
 
         # Log response
         if config.exchange_log:
             defs.log_exchange(response, message)
 
-        # Check response for errors
-        result     = check_response(response)
-        error_code = result[4]
-        error_msg  = result[5]
-        
         # Check if error does not yet exist, sometimes it is delayed
         if error_code == 51603: 
-            recheck = True
-            defs.log_error(f"Warning: Rechecking error, maybe it's delayed, attempt {attempt + 1} / 3")
+            recheck  = True
+            validate = False
+            defs.log_error(f"Warning: Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
 
+        # Check response for errors
+        if validate:
+            result     = check_response(response)
+            error_code = result[4]
+            error_msg  = result[5]
+        
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
         
         # Break out of loop
         if not rate_limit and not recheck: break
+
+	# Announce success
+    if not rate_limit and not recheck:
+        defs.announce(f"Received details for order {orderid}")
+    else:
+        defs.log_error(f"*** Warning: Failed to receive details for order {orderid} ***")
 
     # Debug to stdout
     if debug:
@@ -482,9 +492,11 @@ def get_fills(orderid):
     error_msg  = ""
     rate_limit = False
     recheck    = False
+    validate   = True
 
     # Get reponse
-    for attempt in range(2):    
+    defs.announce(f"Trying to get fills for order {orderid}")
+    for attempt in range(5):    
         message = defs.announce("session: tradeAPI.get_fills()")
         try:
             response = tradeAPI.get_fills(
@@ -499,23 +511,30 @@ def get_fills(orderid):
         if config.exchange_log:
             defs.log_exchange(response, message)
 
-        # Check response for errors
-        result     = check_response(response)
-        error_code = result[4]
-        error_msg  = result[5]
-
         # Check if fills are already present, it's sometimes delayed
-        response = {'code': '0', 'data': [], 'msg': ''}
         if (response['code'] == '0') and (response['data'] == []): 
             recheck = True
-            defs.log_error(f"Warning: Rechecking fills, maybe it's delayed, attempt {attempt + 1} / 3")
+            validate = False
+            defs.log_error(f"Warning: Rechecking get_fills(), maybe it's delayed, attempt {attempt + 1} / 5")
             time.sleep(1)
+
+        # Check response for errors
+        if validate:
+            result     = check_response(response)
+            error_code = result[4]
+            error_msg  = result[5]
 
         # Check API rate limit
         rate_limit = check_limit(result[0], result[2])
         
         # Break out of loop
-        if not rate_limit: break
+        if not rate_limit and not recheck: break
+
+	# Announce success
+    if not rate_limit and not recheck:
+        defs.announce(f"Received fills for order {orderid}")
+    else:
+        defs.log_error(f"*** Warning: Failed to receive fills for order {orderid} ***")
 
     # Debug to stdout
     if debug:

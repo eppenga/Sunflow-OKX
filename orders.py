@@ -529,7 +529,7 @@ def sell(spot, active_order, prices, info):
     # Return data
     return active_order
 
-# Get wallet
+# Get balance
 def get_balance(currency):
 
     # Debug
@@ -553,8 +553,6 @@ def get_balance(currency):
         message = f"*** Error: Failed to get balance for {currency}! ***"
         defs.log_error(message)
         return balance, error_code, error_msg
-
-    pprint.pprint(response)
        
     # Decode response to balance
     try:
@@ -566,13 +564,13 @@ def get_balance(currency):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Wallet information:")
+        defs.announce("Debug: Balance information:")
         pprint.pprint(balance)
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
 
-    # Return wallet
+    # Return balance
     return balance, error_code, error_msg
 
 # Rebalances the database vs exchange by removing orders with the highest price
@@ -652,8 +650,8 @@ def rebalance(all_buys, info):
     # Return all buys
     return all_buys
 
-# Report wallet info to stdout
-def report_wallet(spot, all_buys, info):
+# Report balances info to stdout
+def report_balances(spot, all_buys, info):
 
     # Debug and speed
     debug = False
@@ -690,8 +688,15 @@ def report_wallet(spot, all_buys, info):
         defs.log_error(message)
    
     # Calculate values
-    bot    = base_exchange * spot + quote_exchange    # Bot value in quote according to exchange
-    lost   = base_exchange - base_database            # Lost due to inconsistancies
+    bot  = base_exchange * spot + quote_exchange    # Bot value in quote according to exchange
+    lost = base_exchange - base_database            # Lost due to inconsistancies
+
+    # Round values
+    bot            = defs.round_number(bot, info['quotePrecision'], "down")
+    lost           = defs.round_number(lost, info['basePrecision'], "down")
+    base_exchange  = defs.round_number(base_exchange, info['basePrecision'], "down")
+    base_database  = defs.round_number(base_database, info['basePrecision'], "down")
+    quote_exchange = defs.round_number(quote_exchange, info['quotePrecision'], "down")
     
     # Create messsage
     message_1 = f"Bot value is {defs.format_number(bot, info['quotePrecision'])} {info['quoteCoin']} "
