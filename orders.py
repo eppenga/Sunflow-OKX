@@ -168,7 +168,7 @@ def decode_order(response):
 def decode_fills(response):
     
     # Debug
-    debug = True
+    debug = False
     
     # Debug to stdout
     if debug:
