@@ -425,7 +425,7 @@ def get_order(orderid):
     recheck    = False
 
     # Get reponse
-    defs.announce(f"Trying to get details for order {orderid}")	
+    if debug: defs.announce(f"Trying to get details for order {orderid}")	
     for attempt in range(5):
         
         # Set checks
@@ -465,7 +465,7 @@ def get_order(orderid):
 
 	# Announce success
     if not rate_limit and not recheck:
-        defs.announce(f"Received details for order {orderid}")
+        if debug: defs.announce(f"Received details for order {orderid}")
     else:
         defs.log_error(f"*** Warning: Failed to receive details for order {orderid} ***")
 
@@ -492,7 +492,7 @@ def get_fills(orderid):
     recheck    = False
 
     # Get reponse
-    defs.announce(f"Trying to get fills for order {orderid}")
+    if debug: defs.announce(f"Trying to get fills for order {orderid}")
     for attempt in range(5):
         
         # Set checks
@@ -533,7 +533,7 @@ def get_fills(orderid):
 
 	# Announce success
     if not rate_limit and not recheck:
-        defs.announce(f"Received fills for order {orderid}")
+        if debug: defs.announce(f"Received fills for order {orderid}")
     else:
         defs.log_error(f"*** Warning: Failed to receive fills for order {orderid} ***")
 

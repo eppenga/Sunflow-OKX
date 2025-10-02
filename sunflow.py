@@ -343,11 +343,11 @@ def handle_ticker(message):
                 if active_order['qty_new'] != active_order['qty'] and active_order['qty_new'] > 0:
 
                     # Amend order quantity
-                    pprint.pprint(active_order)
-                    result        = trailing.aqs_helper(active_order, info, all_sells, all_sells_new)
+                    result        = trailing.aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info)
                     active_order  = result[0]
                     all_sells     = result[1]
                     all_sells_new = result[2]
+                    compounding   = result[3]
 
             # Work as a true gridbot when only spread is used
             if use_spread['enabled'] and not use_indicators['enabled'] and not active_order['active']:
@@ -953,12 +953,19 @@ class Runner:
 
     async def run_once(self):
         ws = WsPublicAsync(self.url)
-        await ws.start()
-        await ws.subscribe(self.subs, self.callback)
-        await self.stop_event.wait()
-        with contextlib.suppress(Exception):
-            await ws.unsubscribe(self.subs)
-            await ws.close()
+        try:
+            await ws.start()
+            await ws.subscribe(self.subs, self.callback)
+            await self.stop_event.wait()
+        except Exception as e:
+            print(f"[{self.url}] run_once crashed: {e}")
+            raise
+        finally:
+            # Always try to clean up, even if we crashed
+            with contextlib.suppress(Exception):
+                await ws.unsubscribe(self.subs)
+            with contextlib.suppress(Exception):
+                await ws.close()
 
     async def run_forever(self):
         backoff = 1

@@ -17,12 +17,7 @@ stuck             = {}
 stuck['check']    = True
 stuck['time']     = defs.now_utc()[4]
 stuck['interval'] = config.stuck_interval
-
-# Initialize order recheck variable
-recheck            = {}
-recheck['count']   = 0
-recheck['maximum'] = 3
-   
+  
 # Check if we can do trailing buy or sell
 def check_order(spot, compounding, active_order, all_buys, all_sells, info):
 
@@ -32,7 +27,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     stime = defs.now_utc()[4]
     
     # Declare some variables global
-    global stuck, recheck
+    global stuck
     
     # Initialize variables
     result         = ()
@@ -64,7 +59,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     if do_check_order:
 
         # Report to stdout
-        message = f"Performing {type_check} check on {active_order['side'].lower()} order {active_order['orderid']}'"
+        message = f"Performing {type_check} check on {active_order['side'].lower()} order {active_order['orderid']}"
         defs.announce(message)
 
         # Check stuck next time
@@ -124,7 +119,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     if speed: defs.announce(defs.report_exec(stime))
 
     # Return modified data
-    return active_order, all_buys, compounding, info
+    return active_order, all_buys, compounding
 
 # Checks if the trailing error spiked, order price is either below or above spot depending on side
 def check_spike(spot, active_order, order, all_buys, info):
@@ -192,22 +187,26 @@ def calculate_revenue(order, all_sells, spot, info):
     fees['sell']  = 0
     fees['total'] = 0
     
-    # Logic
+    # Calculate
     sells         = order['cumExecValue']
     buys          = sum(item['cumExecValue'] for item in all_sells)
     fees['buy']   = sum(item['cumExecFee'] for item in all_sells) * spot
     fees['buy']   = defs.round_number(fees['buy'], info['quotePrecision'], "down")
     fees['sell']  = order['cumExecFee']
-    fees['sell']  = defs.round_number(fees['sell'], info['basePrecision'], "down")
     fees['total'] = fees['buy'] + fees['sell']
     revenue       = sells - buys - fees['total']
+
+    # Round numbers
+    sells         = defs.round_number(sells, info['quotePrecision'], "down")
+    buys          = defs.round_number(buys, info['quotePrecision'], "down")
+    fees['total'] = defs.round_number(fees['total'], info['quotePrecision'], "down")
+    revenue       = defs.round_number(revenue, info['quotePrecision'], "down")
     
     # Report to stdout for debug
-    if debug:
-        message = f"Debug: Total sells {sells} {info['quoteCoin']}, buys {buys} {info['quoteCoin']}, "
-        message = message + f"buy fees {fees['buy']} {info['quoteCoin']}, sell fees {fees['sell']} {info['quoteCoin']}, total fees {fees['total']} {info['quoteCoin']}, "
-        message = message + f"giving a profit of {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
-        defs.announce(message)
+    message  = f"Sold {sells} {info['quoteCoin']}, bought {buys} {info['quoteCoin']}, "
+    message += message + f"fees {fees['total']} {info['quoteCoin']} and therefore "
+    message += message + f"profit is {revenue} {info['quoteCoin']}"
+    defs.announce(message)
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -327,7 +326,6 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
     active_order = result[0]
     all_buys     = result[1]
     compounding  = result[2]
-    info         = result[3]
 
     # Order still exists, we can do trailing buy or sell
     if active_order['active']:
@@ -344,6 +342,14 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
         elif active_order['side'] == "Buy":
             active_order['trigger_new'] = defs.round_number(spot * (1 + (active_order['fluctuation'] / 100)), info['tickSize'], "up")
 
+        # Check if we are too close to spot price (OKX can't handle that), reduce it with the minimum amount
+        if active_order['trigger_new'] == spot:
+            if debug: defs.announce(f"*** Warning: New trigger price too close to spot ***")
+            if active_order['side'] == "Sell":
+                active_order['trigger_new'] = active_order['trigger_new'] - info['quotePrecision']
+            elif active_order['side'] == "Buy":
+                active_order['trigger_new'] = active_order['trigger_new'] + info['quotePrecision']
+
         # Check if we can amend trigger price
         if active_order['side'] == "Sell":
             if active_order['trigger_new'] > active_order['trigger']:
@@ -354,9 +360,11 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
 
         # Amend trigger price
         if do_amend:
-            result       = atp_helper(active_order, all_buys, info)
+            result       = atp_helper(active_order, all_buys, all_sells, compounding, spot, info)
             active_order = result[0]
             all_buys     = result[1]
+            all_sells    = result[2]
+            compounding  = result[3]
         
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -365,7 +373,7 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
     return active_order, all_buys, compounding, info
 
 # Change trigger price current trailing sell helper
-def aqs_helper(active_order, info, all_sells, all_sells_new):
+def aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info):
 
     # Initialize variables
     debug       = False
@@ -388,6 +396,18 @@ def aqs_helper(active_order, info, all_sells, all_sells_new):
         message += f"to {defs.format_number(active_order['qty_new'], info['basePrecision'])} {info['baseCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
         all_sells = all_sells_new
+
+    elif error_code == -1:  # Enter any error_code here you would like specific actions
+    
+        # Comment what is going wrong
+        message = f"*** Warning: Your warning message ***\n>>> Message: {error_code} - {error_msg}"
+        defs.announce(message)
+        
+        # Check the order, maybe it was filled in the meantime
+        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
+        active_order = result[0]
+        all_buys     = result[1]
+        compounding  = result[2]   
        
     else:
 
@@ -396,7 +416,7 @@ def aqs_helper(active_order, info, all_sells, all_sells_new):
         defs.log_error(message)
 
     # Return data
-    return active_order, all_sells, all_sells_new
+    return active_order, all_sells, all_sells_new, compounding
 
 # Change the quantity of the current trailing sell
 def amend_qty_sell(active_order, info):
@@ -440,7 +460,7 @@ def amend_qty_sell(active_order, info):
     return response, error_code, error_msg
 
 # Change quantity trailing sell helper
-def atp_helper(active_order, all_buys, info):
+def atp_helper(active_order, all_buys, all_sells, compounding, spot, info):
 
     # Initialize variables
     debug      = False
@@ -464,23 +484,17 @@ def atp_helper(active_order, all_buys, info):
         defs.announce(message)
         active_order['trigger'] = active_order['trigger_new']        
 
-    elif (error_code == 51280) or (error_code == 51278):
+    elif error_code == -1:  # Enter any error_code here you would like specific actions
     
-        # Order went up to fast, SL order couldnt keep up, reset and replace
-        # error_code = 51280 - SL trigger price must be less than the last price
-        # error_code = 51278 - SL trigger price cannot be lower than the last price
-        message = f"*** Warning: Order couldn't keep up, trailing cancelled ***\n>>> Message: {error_code} - {error_msg}"
+        # Comment what is going wrong
+        message = f"*** Warning: Your warning message ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
-
-        # Try to remove order
-        result       = database.remove(active_order, all_buys, info)
+        
+        # Check the order, maybe it was filled in the meantime
+        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
         active_order = result[0]
         all_buys     = result[1]
-        error_code   = result[2]
-        error_msg    = result[3]
-        if error_code !=0:
-            message = f"*** Warning: Trying to remove order while trailing ***\n>>> Message: {error_code} - {error_msg}"
-            defs.log_error(message)
+        compounding  = result[2]
     
     else:
 
@@ -489,7 +503,7 @@ def atp_helper(active_order, all_buys, info):
         defs.log_error(message)
     
     # Return active_order
-    return active_order, all_buys
+    return active_order, all_buys, all_sells, compounding
 
 # Change the trigger price of the current trailing sell
 def amend_trigger_price(active_order, info):
