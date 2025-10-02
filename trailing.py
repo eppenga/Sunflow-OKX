@@ -248,45 +248,33 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
         print()
 
     # Get fills for the closed order   
-    result     = orders.get_fills(active_order['linkedid'])
+    result     = orders.get_linked_order(active_order['linkedid'])
     fills      = result[0]
     error_code = result[1]
     error_msg  = result[2]
     if error_code != 0:
-        message = f"*** Error: Failed to get fills when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+        message = f"*** Error: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
         return active_order, all_buys, all_sells, order, revenue
 
     # Glue order and fills together
     order = orders.merge_order_fills(order, fills, info)
-    defs.announce(f"Merged order {active_order['orderid']} with fills from linked SL order {active_order['linkedid']}")
+    defs.announce(f"Merged order {active_order['orderid']} with fills from linked order {active_order['linkedid']}")
 
     # Set Sunflow order status to Closed
     order['status'] = "Closed"
-
-    # Debug: Show order
-    if debug:
-        defs.announce(f"Debug: {active_order['side']} order")
-        pprint.pprint(order)
-        print()
           
     # Order was bought, create new all buys database
     if order['side'] == "Buy":
         all_buys = database.register_buy(order, all_buys, info)
     
-    # Order was sold, create new all buys database, rebalance database and clear all sells
+    # Order was sold, create new all buys database and clear all sells
     if order['side'] == "Sell":
-
-        # Debug to stdout
-        if debug:
-            defs.announce("Debug: All buy orders matching sell order")
-            pprint.pprint(all_sells)
-            print()
 
         # Calculate revenue
         revenue = calculate_revenue(order, all_sells, spot, info)
         
-        # Create new all buys database
+        # Create new all_buys database
         all_buys = database.register_sell(all_buys, all_sells, info)
                 
         # Clear all sells

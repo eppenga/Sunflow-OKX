@@ -52,6 +52,46 @@ def get_order(orderid):
     # Return order
     return order, error_code, error_msg
 
+# Get order details
+def get_linked_order(linkedid):
+    
+    # Debug and speed
+    debug = True
+    speed = True
+    stime = defs.now_utc()[4]
+        
+    # Initialize variables
+    fills      = {}
+    response   = {}
+    result     = ()
+    error_code = 0
+    error_msg  = ""
+
+    # Get response from exchange
+    result     = exchange.get_linked_order(linkedid)
+    response   = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
+    
+    # Decode response to order
+    if error_code == 0:
+        fills = decode_linked_order(response)
+  
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Linked order details via exchange")
+        pprint.pprint(response)
+        print()
+        defs.announce("Debug: Linked order details decoded")
+        pprint.pprint(fills)
+        print()
+
+    # Report execution time
+    if speed: defs.announce(defs.report_exec(stime))
+
+    # Return order
+    return fills, error_code, error_msg
+
 # Get order fills
 def get_fills(linkedid):
 
@@ -121,7 +161,7 @@ def cancel_order(orderid):
     # Return error code
     return response, error_code, error_msg
 
-# Decode response from exchange to proper dictionary
+# Decode order from exchange
 def decode_order(response):
     
     # Debug
@@ -164,7 +204,40 @@ def decode_order(response):
     # Return order
     return order
 
-# Decode fills from exchange to proper dictionary
+# Decode linked order from exchange to get the fills
+def decode_linked_order(response):
+    
+    # Debug
+    debug = False
+    
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Before decode:")
+        pprint.pprint(response)
+        print()
+
+    # Initialize variables
+    fills  = {}
+    result = response['data'][0]
+
+    # Map fills to response
+    fills['orderStatus']   = result['state'].capitalize()                   # Order state: Canceled, Live, Partially_filled, Filled and Mmp_canceled
+    fills['avgPrice']      = float(result['fillPx'])                        # Average fill price in quote (USDT)
+    fills['cumExecQty']    = float(result['fillSz'])                        # Cumulative executed quantity in base (BTC)
+    fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value in quote (USDT)
+    fills['cumExecFee']    = float(result['fee']) * -1                      # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
+    fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency 
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: After decode:")
+        pprint.pprint(fills)
+        print()
+
+    # Return fills
+    return fills
+
+# Decode fills from exchange
 def decode_fills(response):
     
     # Debug
@@ -200,7 +273,7 @@ def decode_fills(response):
 def merge_order_fills(order, fills, info):
 
     # Debug
-    debug = False
+    debug = True
     
     # Merge fills into order
     order['avgPrice']      = fills['avgPrice']

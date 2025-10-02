@@ -114,10 +114,10 @@ def get_ticker():
     rate_limit = False
 
     # Get response
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce(f"session: marketDataAPI.get_ticker()")
         try:
-            response   = marketDataAPI.get_ticker(
+            response = marketDataAPI.get_ticker(
                 instId = config.symbol
             )
         except Exception as e:
@@ -161,10 +161,10 @@ def get_klines(interval, limit):
     rate_limit = False    
 
     # Get response
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: marketDataAPI.get_candlesticks()")
         try:
-            response   = marketDataAPI.get_candlesticks(
+            response = marketDataAPI.get_candlesticks(
                 instId = config.symbol,
                 bar    = interval,
                 limit  = limit
@@ -210,10 +210,10 @@ def get_instruments():
     rate_limit = False    
 
     # Get reponse
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: publicDataAPI.get_instruments()")
         try:
-            response     = publicDataAPI.get_instruments(
+            response = publicDataAPI.get_instruments(
                 instType = "SPOT",
                 instId   = config.symbol
             )
@@ -258,10 +258,10 @@ def get_fees():
     rate_limit = False    
 
     # Get response
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: accountAPI.get_fee_rates()")
         try:
-            response     = accountAPI.get_fee_rates(
+            response = accountAPI.get_fee_rates(
                 instType = "SPOT",
                 instId   = config.symbol
             )
@@ -306,7 +306,7 @@ def get_balance(currency):
     rate_limit = False
 
     # Get reponse
-    for attempt in range(2):    
+    for attempt in range(3):    
         message = defs.announce("session: accountAPI.get_account_balance()")
         try:
             response = accountAPI.get_account_balance(
@@ -365,7 +365,7 @@ def place_order(active_order):
         print(f"slOrdPx     = -1\n")
 
     # Get response
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: tradeAPI.place_algo_order()")
         try:
             kwargs = {
@@ -435,7 +435,7 @@ def get_order(orderid):
         # Query exchange
         message = defs.announce("session: tradeAPI.get_algo_order_details()")
         try:
-            response   = tradeAPI.get_algo_order_details(
+            response = tradeAPI.get_algo_order_details(
                 algoId = str(orderid)
             )
         except Exception as e:
@@ -468,6 +468,74 @@ def get_order(orderid):
         if debug: defs.announce(f"Received details for order {orderid}")
     else:
         defs.log_error(f"*** Warning: Failed to receive details for order {orderid} ***")
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+
+# Get order
+def get_linked_order(linkedid):
+
+    # Debug
+    debug = False
+    
+    # Initialize variables
+    response   = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False
+    recheck    = False
+
+    # Get reponse
+    if debug: defs.announce(f"Trying to get all fills on linked order {linkedid}")	
+    for attempt in range(5):
+        
+        # Set checks
+        rate_limit = False
+        recheck    = False
+        
+        # Query exchange
+        message = defs.announce("session: tradeAPI.get_order()")
+        try:
+            response = tradeAPI.get_order(
+                instId = config.symbol,
+                ordId  = str(linkedid)
+            )
+        except Exception as e:
+            message = f"*** Error: Failed to get all fills on linked order {linkedid} ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result = check_response(response, True)
+        error_code = result[4]
+        error_msg  = result[5]
+
+        # Check if order is already filled, it's sometimes delayed
+        if (response['code'] != '0') and (response['data'][0]['state'] != 'filled'):
+            recheck = True
+            defs.announce(f"Rechecking get_linked_order(), maybe it's delayed, attempt {attempt + 1} / 5")
+            time.sleep(1)
+       
+        # Check API rate limit, if hit then True
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if (not rate_limit) and (not recheck): break
+
+	# Announce success
+    if not rate_limit and not recheck:
+        if debug: defs.announce(f"Received all fills for linked order {linkedid}")
+    else:
+        defs.log_error(f"*** Warning: Failed to receive all fills for linked order {linkedid} ***")
 
     # Debug to stdout
     if debug:
@@ -559,10 +627,10 @@ def cancel_order(orderid):
     rate_limit = False
 
     # Get reponse
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: tradeAPI.amend_algo_order()")
         try:
-            response           = tradeAPI.amend_algo_order(
+            response = tradeAPI.amend_algo_order(
                 instId         = config.symbol,
                 algoId         = str(orderid),
                 newSlTriggerPx = '0',
@@ -620,19 +688,19 @@ def amend_order(orderid, new_price=0, new_qty=0):
         return response, error_code, error_msg
     
     # Get reponse
-    for attempt in range(2):
+    for attempt in range(3):
         message = defs.announce("session: tradeAPI.amend_algo_order()")
         try:
 
             if new_price !=0:
-                response   = tradeAPI.amend_algo_order(
+                response = tradeAPI.amend_algo_order(
                     instId = config.symbol,
                     algoId = str(orderid),
                     newSlTriggerPx = str(new_price)
                 )
 
             if new_qty !=0:
-                response   = tradeAPI.amend_algo_order(
+                response = tradeAPI.amend_algo_order(
                     instId = config.symbol,
                     algoId = str(orderid),
                     newSz  = str(new_qty)

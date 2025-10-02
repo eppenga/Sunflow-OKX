@@ -20,13 +20,20 @@ def save(all_buys, info):
     speed = True
     stime = defs.now_utc()[4]
 
+    # Initialize variables
+    count  = 0
+    total  = 0
+    result = ()
+
     # Write the file
     with open(config.dbase_file, 'w', encoding='utf-8') as json_file:
         json.dump(all_buys, json_file)
 
     # Get statistics and output to stdout
     result = order_count(all_buys, info)
-    defs.announce(f"Database contains {result[0]} buy orders and {defs.format_number(result[1], info['basePrecision'])} {info['baseCoin']} was bought")
+    count  = result[0]
+    total  = result[1]
+    defs.announce(f"Database contains {count} buy orders and {total} {info['baseCoin']} was bought")
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -138,43 +145,42 @@ def remove_buy(orderid, all_buys, info):
 # Register all buys in a database file
 def register_buy(buy_order, all_buys, info):
 
-    # Debug
     debug = False
     speed = False
     stime = defs.now_utc()[4]
 
     # Initialize variables
-    counter       = 0
-    all_buys_new  = []
-    loop_buy      = False
-    loop_appended = False
-    
+    found        = False
+    all_buys_new = []
+
     # Check if order already exists in all buys database
-    for loop_buy in all_buys:
-        if loop_buy['orderid'] == buy_order['orderid']:
-            counter = counter + 1
-            loop_appended = True
-            loop_buy = buy_order
-        all_buys_new.append(loop_buy)
-    
-    # If not found in all buys database, then add new buy order
-    if not loop_appended:
+    for existing in all_buys:
+        if existing['orderid'] == buy_order['orderid']:
+            all_buys_new.append(buy_order)
+            found = True
+        else:
+            all_buys_new.append(existing)
+
+    # If not found, add as new order
+    if not found:
         all_buys_new.append(buy_order)
-        counter = counter + 1
-      
-    # Debug to stdout
-    if debug:
-        defs.announce(f"Debug: New database with {counter} buy orders")
-        print(all_buys_new)
-        print()
 
     # Save to database
-    save(all_buys_new, info)    
+    save(all_buys_new, info)
+
+    # Report to stdout
+    defs.announce("Registered 1 order via trailing buy")
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: This was the new buy order that was added to the database:")
+        pprint.pprint(buy_order)
+        print()
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
-    
-    # Return new buy database
+
+    # Return new all_buys database
     return all_buys_new
 
 # Remove all sold buy orders from the database file
@@ -186,40 +192,35 @@ def register_sell(all_buys, all_sells, info):
     stime = defs.now_utc()[4]
     
     # Initialize variables
-    unique_ids = 0
+    unique_ids   = 0
+    all_buys_new = []
     
     # Get a set of all sell order IDs for efficient lookup
     sell_order_ids = {sell['orderid'] for sell in all_sells}
 
     # Filter out all_buys entries that have their orderid in sell_order_ids
-    filtered_buys = [buy for buy in all_buys if buy['orderid'] not in sell_order_ids]
+    all_buys_new = [buy for buy in all_buys if buy['orderid'] not in sell_order_ids]
 
     # Count unique order ids
     unique_ids = len(sell_order_ids)
     
     # Save to database
-    save(filtered_buys, info)
+    save(all_buys_new, info)
+
+    # Report to stdout
+    defs.announce(f"Registered {unique_ids} orders via trailing sell")
     
     # Debug to stdout
     if debug:
-        print("All sell orders")
+        defs.announce("Debug: These were new sell order(s) that were removed from the database:")
         pprint.pprint(all_sells)
-        
-        print("\nRemoved these unique ids")
-        pprint.pprint(sell_order_ids)
-        
-        print("\nNew all buys database")
-        pprint.pprint(filtered_buys)
         print()
     
-    # Report to stdout
-    defs.announce(f"Sold {unique_ids} orders via trailing sell")
-
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
     
     # Return the cleaned buys
-    return filtered_buys
+    return all_buys_new
 
 # Determine number of orders and qty
 def order_count(all_buys, info):

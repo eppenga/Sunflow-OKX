@@ -341,7 +341,7 @@ def check_orders(all_buys, info):
                 defs.log_error(message)
 
         # Assign status, if not filled (effective at OKX) just disregard
-        if "Effective" in temp_order['orderStatus']:
+        if temp_order['orderStatus'] == "Effective":
             temp_order['status'] = "Closed"
             all_buys_new.append(temp_order)
         
