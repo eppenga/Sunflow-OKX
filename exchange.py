@@ -426,7 +426,7 @@ def get_order(orderid):
 
     # Get reponse
     if debug: defs.announce(f"Trying to get details for order {orderid}")	
-    for attempt in range(5):
+    for attempt in range(10):
         
         # Set checks
         rate_limit = False
@@ -454,8 +454,8 @@ def get_order(orderid):
         # Check if order does not yet exist, it's sometimes delayed
         if error_code == 51603: 
             recheck = True
-            defs.announce(f"Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 5")
-            time.sleep(1)
+            defs.announce(f"Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 10")
+            time.sleep(1 + attempt)
        
         # Check API rate limit, if hit then True
         rate_limit = check_limit(result[0], result[2])
@@ -493,7 +493,7 @@ def get_linked_order(linkedid):
 
     # Get reponse
     if debug: defs.announce(f"Trying to get all fills on linked order {linkedid}")	
-    for attempt in range(5):
+    for attempt in range(10):
         
         # Set checks
         rate_limit = False
@@ -522,8 +522,8 @@ def get_linked_order(linkedid):
         # Check if order is already filled, it's sometimes delayed
         if (response['code'] != '0') and (response['data'][0]['state'] != 'filled'):
             recheck = True
-            defs.announce(f"Rechecking get_linked_order(), maybe it's delayed, attempt {attempt + 1} / 5")
-            time.sleep(1)
+            defs.announce(f"Rechecking get_linked_order(), maybe it's delayed, attempt {attempt + 1} / 10")
+            time.sleep(1 + attempt)
        
         # Check API rate limit, if hit then True
         rate_limit = check_limit(result[0], result[2])

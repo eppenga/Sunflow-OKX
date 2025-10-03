@@ -56,7 +56,7 @@ def get_order(orderid):
 def get_linked_order(linkedid):
     
     # Debug and speed
-    debug = True
+    debug = False
     speed = True
     stime = defs.now_utc()[4]
         
@@ -273,7 +273,7 @@ def decode_fills(response):
 def merge_order_fills(order, fills, info):
 
     # Debug
-    debug = True
+    debug = False
     
     # Merge fills into order
     order['avgPrice']      = fills['avgPrice']
@@ -501,7 +501,6 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
 
     # Store the order in the database buys file
     all_buys = database.register_buy(order, all_buys, info)
-    defs.announce(f"Registered buy order in database {config.dbase_file}")
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -653,7 +652,7 @@ def rebalance(all_buys, info):
     stime = defs.now_utc()[4]
 
     # Initialize variables
-    equity_balance  = 0
+    equity_balance = 0
     equity_dbase   = 0
     equity_diff    = 0
     equity_remind  = 0
@@ -668,7 +667,7 @@ def rebalance(all_buys, info):
         defs.announce("Debug: Trying to rebalance buys database with exchange data")
    
     # Get equity for basecoin
-    result = get_balance(info['baseCoin'])
+    result         = get_balance(info['baseCoin'])
     equity_balance = result[0]
     error_code     = result[1]
     error_msg      = result[2]
@@ -683,11 +682,12 @@ def rebalance(all_buys, info):
 
     # Debug to stdout
     if debug:
-        defs.announce(f"Debug: Before rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
-        defs.announce(f"Debug: Before rebalance equity in database: {equity_dbase} {info['baseCoin']}")
+        defs.announce(f"Debug: Before: Rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
+        defs.announce(f"Debug: Before: Rebalance equity in database: {equity_dbase} {info['baseCoin']}")
+        defs.announce(f"Debug: Before: Exchange equity including margin: {equity_balance * (1 + (config.rebalance_margin / 100))}")
 
     # Selling more than we have
-    while equity_dbase > equity_balance:
+    while equity_dbase > equity_balance * (1 + (config.rebalance_margin / 100)):
         
         # Database changed
         dbase_changed = True
@@ -696,6 +696,8 @@ def rebalance(all_buys, info):
         highest_avg_price_item = max(all_buys, key=lambda x: x['avgPrice'])
 
         # Remove this item from the list
+        if debug: defs.announce(f"Debug: Going to remove order {highest_avg_price_item['orderid']} from all_buys database")
+        exit()
         all_buys = database.remove_buy(highest_avg_price_item['orderid'], all_buys, info)
         
         # Recalculate all buys
@@ -703,8 +705,8 @@ def rebalance(all_buys, info):
 
     # Debug to stdout
     if debug:
-        defs.announce(f"Debug: After rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
-        defs.announce(f"Debug: After rebalance equity in database: {equity_dbase} {info['baseCoin']}")
+        defs.announce(f"Debug: After: Rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
+        defs.announce(f"Debug: After: Rebalance equity in database: {equity_dbase} {info['baseCoin']}")
 
     # Save new database
     if dbase_changed:

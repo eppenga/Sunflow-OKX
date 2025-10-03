@@ -78,9 +78,9 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         if order['orderStatus'] == "Effective":
             
             # Prepare message for stdout
-            defs.announce(f"Trailing {active_order['side'].lower()}: *** Order has been filled! ***")
-            message = f"{active_order['side']} order closed for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
-            message = message + f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
+            defs.announce(f"*** Trailing {active_order['side'].lower()} order has been filled! ***")
+            message  = f"{active_order['side']} order closed for {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']} "
+            message += f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
             
             # Close trailing process
             result       = close_trail(active_order, all_buys, all_sells, spot, info)
@@ -92,10 +92,10 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         
             # Fill in average price and report message
             if active_order['side'] == "Buy":
-                message = message + f" and fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
+                message += f" and fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
             elif active_order['side'] == "Sell":
-                message = message + f", fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']} "
-                message = message + f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
+                message += f", fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']} "
+                message += f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
             defs.announce(message)
            
             # Report balances and adjust compounding
@@ -174,7 +174,7 @@ def check_spike(spot, active_order, order, all_buys, info):
 def calculate_revenue(order, all_sells, spot, info):
     
     # Debug and speed
-    debug = True
+    debug = False
     speed = True
     stime = defs.now_utc()[4]
     
@@ -203,10 +203,11 @@ def calculate_revenue(order, all_sells, spot, info):
     revenue       = defs.round_number(revenue, info['quotePrecision'], "down")
     
     # Report to stdout for debug
-    message  = f"Sold {sells} {info['quoteCoin']}, bought {buys} {info['quoteCoin']}, "
-    message += message + f"fees {fees['total']} {info['quoteCoin']} and therefore "
-    message += message + f"profit is {revenue} {info['quoteCoin']}"
-    defs.announce(message)
+    if debug:
+        message  = f"Sold {sells} {info['quoteCoin']}, bought {buys} {info['quoteCoin']}, "
+        message += f"fees {fees['total']} {info['quoteCoin']} and therefore "
+        message += f"profit is {revenue} {info['quoteCoin']}"
+        defs.announce(message)
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))

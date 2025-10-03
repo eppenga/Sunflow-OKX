@@ -120,25 +120,25 @@ def remove_buy(orderid, all_buys, info):
     # Initialize variables
     all_buys_new = []
     order_found  = False
-    
+
     # Remove the order
     for loop_buy in all_buys:
-        if loop_buy['orderid'] != orderid:
+        if loop_buy.get('orderid') == orderid:
             order_found = True
-            all_buys_new.append(loop_buy)
+            continue
+        all_buys_new.append(loop_buy)
 
     # Check if order was found
     if order_found:
-        # Save to database
         save(all_buys_new, info)
-        defs.announce(f"Order {orderid} was removed from all_buys database!")    
+        defs.announce(f"Order {orderid} was removed from all_buys database!")
     else:
-        all_buys_new = all_buys
+        all_buys_new = all_buys  # no changes
         defs.announce(f"Order {orderid} was not found in all_buys database!")
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
-    
+
     # Return database
     return all_buys_new
 
@@ -169,7 +169,7 @@ def register_buy(buy_order, all_buys, info):
     save(all_buys_new, info)
 
     # Report to stdout
-    defs.announce("Registered 1 order via trailing buy")
+    defs.announce(f"Registered 1 {buy_order['status'].lower()} buy order in database")
 
     # Debug to stdout
     if debug:
@@ -208,7 +208,7 @@ def register_sell(all_buys, all_sells, info):
     save(all_buys_new, info)
 
     # Report to stdout
-    defs.announce(f"Registered {unique_ids} orders via trailing sell")
+    defs.announce(f"Registered {unique_ids} closed sell orders in database")
     
     # Debug to stdout
     if debug:
