@@ -213,19 +213,7 @@ def get_info(spot, multiplier, compounding):
         message = f"*** Error: Failed to get info ***\n>>> Message {error_code} - {error_msg}"
         defs.log_error(message)
         return info
-    
-    # Load fee rates
-    result     = exchange.get_fees()
-    rates      = result[0]['data'][0]
-    error_code = result[1]
-    error_msg  = result[2]
-
-    # Check for errors
-    if error_code !=0:
-        message = f"*** Error: Failed to get fee rates ***\n>>> Message {error_code} - {error_msg}"
-        defs.log_error(message)
-        return info  
-
+   
     # Transform instrument info and fee rates into required format
     info['time']           = defs.now_utc()[4]                # Time of last instrument update
     info['symbol']         = instrument['instId']             # Symbol
@@ -236,8 +224,6 @@ def get_info(spot, multiplier, compounding):
     info['quotePrecision'] = float(instrument['tickSz'])      # Decimal precision of quote asset (USDT)
     info['minOrderQty']    = float(instrument['minSz'])       # Minimum order quantity in base asset (BTC)
     info['tickSize']       = float(instrument['tickSz'])      # Smallest possible price increment of base asset (USDT)
-    info['feeMaker']       = abs(float(rates['maker']))       # Maker fee
-    info['feeTaker']       = abs(float(rates['taker']))       # Taker fee
 
     # Calculate info['buyBase'] and info['buyQuote']
     info = calc_info(info, spot, multiplier, compounding)

@@ -126,4 +126,4 @@ func_norm_delay         = 2500                                       # Show mess
 func_warn_delay         = 5000                                       # Show warning when execution of a function is greater in ms
 uptime_delay            = 10000                                      # Show uptime ping message if no ticker is received
 uptime_expire           = 10000000                                   # Maximum time between tickers before Sunflow will exit
-runner_inactive         = 25000                                      # Inactivity timeout for websocket runner
+stuck_interval          = 30000                                      # If exchange returns no order data, do an additional check

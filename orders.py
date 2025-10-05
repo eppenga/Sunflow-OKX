@@ -92,46 +92,6 @@ def get_linked_order(linkedid):
     # Return order
     return fills, error_code, error_msg
 
-# Get order fills
-def get_fills(linkedid):
-
-    # Debug and speed
-    debug = False
-    speed = True
-    stime = defs.now_utc()[4]
-        
-    # Initialize variables
-    fills      = {}
-    response   = {}
-    result     = ()
-    error_code = 0
-    error_msg  = ""
-
-    # Get response from exchange
-    result     = exchange.get_fills(linkedid)
-    response   = result[0]
-    error_code = result[1]
-    error_msg  = result[2]
-    
-    # Decode response to order
-    if error_code == 0:
-        fills = decode_fills(response)
-    
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: Fill details via exchange")
-        pprint.pprint(response)
-        print()
-        defs.announce("Debug: Fill details decoded")
-        pprint.pprint(fills)
-        print()
-
-    # Report execution time
-    if speed: defs.announce(defs.report_exec(stime))
-
-    # Return order
-    return fills, error_code, error_msg
-
 # Cancel an order at the exchange
 def cancel_order(orderid):
 

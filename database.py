@@ -208,7 +208,7 @@ def register_sell(all_buys, all_sells, info):
     save(all_buys_new, info)
 
     # Report to stdout
-    defs.announce(f"Registered {unique_ids} closed sell orders in database")
+    defs.announce(f"Removed {unique_ids} closed sell orders from database")
     
     # Debug to stdout
     if debug:

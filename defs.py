@@ -226,9 +226,18 @@ def log_revenue(active_order, order, revenue, info, sides=True, extended=False):
     seperator = "\n----------------------------------------\n"
     timestamp = defs.now_utc()[0]
     
-    # Round two variables
-    revenue               = defs.round_number(revenue, info['quotePrecision'])
-    order['cumExecValue'] = defs.round_number(order['cumExecValue'], info['quotePrecision'])
+    # Round numbers
+    order['avgPrice']           = defs.round_number(order['avgPrice'], info['quotePrecision'], "down")
+    order['qty']                = defs.round_number(order['qty'], info['basePrecision'], "down")
+    active_order['trigger_ini'] = defs.round_number(active_order['trigger_ini'], info['quotePrecision'], "down")
+    order['triggerPrice']       = defs.round_number(order['triggerPrice'], info['quotePrecision'], "down")
+    order['cumExecQty']         = defs.round_number(order['cumExecQty'], info['basePrecision'], "down")
+    order['cumExecValue']       = defs.round_number(order['cumExecValue'], info['quotePrecision'], "down")
+    revenue                     = defs.round_number(revenue, info['quotePrecision'], "down")
+    if active_order[ 'side'] == "Buy":
+        order['cumExecFee'] = defs.round_number(order['cumExecFee'], info['basePrecision'], "down")
+    elif active_order['side'] == "Sell":
+        order['cumExecFee'] = defs.round_number(order['cumExecFee'], info['quotePrecision'], "down")
 
     # Check if we can log
     if (not extended) and (not sides) and (order['side'] == "Buy"):
@@ -242,7 +251,7 @@ def log_revenue(active_order, order, revenue, info, sides=True, extended=False):
         r_order = "revenue\n" + pprint.pformat(revenue)
         i_order = "info\n" + pprint.pformat(info)
         message = divider + timedis+ seperator + a_order + seperator + t_order + seperator + r_order + seperator + i_order
-
+   
     # Format data for normal messaging
     # UTC Time, createdTime, orderid, linkedid, side, symbol, baseCoin, quoteCoin, orderType, orderStatus, avgPrice, qty, trigger_ini, triggerPrice, cumExecFeeCcy, cumExecFee, cumExecQty, cumExecValue, revenue
     if not extended:
@@ -862,3 +871,20 @@ def report_exec(start_time, supplement = "", always_display = False):
         
     # Return message
     return message
+
+# Convert miliseconds to time format
+def format_ms(milliseconds):
+    
+    # Initialize variables
+    formatted_time = ""
+    
+    # Logic
+    total_seconds, remainder_ms = divmod(milliseconds, 1000)
+    hours, remainder_sec = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder_sec, 60)
+    hundreds = remainder_ms // 10  # hundredths of a second
+
+    # Format with leading zeros
+    formatted_time = f"{hours:02}:{minutes:02}:{seconds:02}.{hundreds:02}"
+
+    return formatted_time

@@ -270,6 +270,10 @@ def handle_ticker(message):
             # Store new spot price
             new_spot = ticker['lastPrice']
 
+            # Reset uptime notice
+            uptime_ping['time']   = current_time
+            uptime_ping['record'] = current_time
+
             # Optimize profit and distance percentages
             if optimizer['enabled']:
                 result       = optimum.optimize(prices, profit, active_order, use_spread, optimizer)
@@ -284,10 +288,6 @@ def handle_ticker(message):
             active_order['qty_new'] = result[1]
             can_sell                = result[2]
             rise_to                 = result[3]
-
-            # Reset uptime notice
-            uptime_ping['time']   = current_time
-            uptime_ping['record'] = current_time            
 
             # Report to stdout "Price went up/down from ..."
             message = defs.report_ticker(spot, new_spot, rise_to, active_order, all_buys, info)
@@ -340,7 +340,11 @@ def handle_ticker(message):
             if active_order['active'] and active_order['side'] == "Sell":
 
                 # Only amend order if the quantity to be sold has changed
-                if active_order['qty_new'] != active_order['qty'] and active_order['qty_new'] > 0:
+                defs.announce(f"Debug: Trying to amend quantity sell, {active_order['qty_new']} >= {info['minOrderQty']}")
+                pprint.pprint(active_order)
+                print(info['minOrderQty'])
+                print()
+                if (active_order['qty_new'] != active_order['qty']) and (active_order['qty_new'] >= info['minOrderQty']):
 
                     # Amend order quantity
                     result        = trailing.aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info)
@@ -848,42 +852,52 @@ defs.announce(f"Sunflow started at {time_output}")
 
 # Run tasks periodically
 def periodic_tasks(current_time):
-    
+
     # Debug
     debug = False
-    
+
     # Declare some variables global
     global info
-    
+
     # Get info
     info = preload.get_info(spot, multiplier, compounding)
-    
+
     # Return
     return
 
-# Run tasks periodically
+# Ping message periodically
 def ping_message(current_time):
-    
+
     # Debug
     debug = False
 
     # Initialize variables
-    expire        = uptime_ping['expire']
-    delay_ping    = current_time - uptime_ping['time']
-    delay_tickers = current_time - uptime_ping['record']
-    
-    # Check for to little action
+    expire        = uptime_ping["expire"]
+    delay_ping    = current_time - uptime_ping["time"]
+    delay_tickers = current_time - uptime_ping["record"]
+
+    # Check for too little action -> now force a resubscribe
     if delay_tickers > expire:
-        message = f"*** Error: Ping, last ticker update of {delay_tickers} ms ago is larger than {expire} ms maximum! ***"
+
+        # Reset uptime notice
+        uptime_ping['time']   = current_time
+        uptime_ping['record'] = current_time
+        
+        # Report to stdout
+        message = f"*** Warning: Ping, last ticker update of {delay_tickers:,} ms ago is larger than {expire:,} ms maximum! ***"
         defs.log_error(message)
+        
+        # Request resubscribe
+        message = f"Ticker stall: Last update {delay_tickers:,} ms > {expire:,} ms"
+        request_resubscribe(message)
 
     # Report to stdout
-    if uptime_ping['enabled']:
+    if uptime_ping["enabled"]:
         if delay_ping == delay_tickers:
-            defs.announce(f"Ping, {delay_ping} ms since last message and ticker update")
+            defs.announce(f"Ping, {delay_ping:,} ms since last message and ticker")
         else:
-            defs.announce(f"Ping, {delay_ping} ms since last message and last ticker update was {delay_tickers} ms ago")
-    
+            defs.announce(f"Ping, {delay_ping:,} ms since last message and ticker update was {delay_tickers:,} ms ago")
+
     # Return
     return
 
@@ -893,17 +907,37 @@ def ping_message(current_time):
 # Load websocket
 from okx.websocket.WsPublicAsync import WsPublicAsync
 
+# Global resubscribe event and helper state container
+resubmit_event = asyncio.Event()
+_state = {"runners": [], "tasks": []}
+
+# Announce once and signal the watcher to rebuild streams
+def request_resubscribe(reason: str = ""):
+    
+    # Report to stdout
+    if reason:
+        defs.announce(f"*** Warning: Websocket resubscribe: {reason} ***")
+    else:
+        defs.announce( "*** Warning: Websocket resubscribe ***")
+
+    # Resubmit event set
+    resubmit_event.set()
+    
+    # Return
+    return
+
 # Initialize candles
 candles = {}
-if use_indicators['enabled']:
-    if use_indicators['intervals'][1] != "":
-        candles["candle" + use_indicators['intervals'][1]] = True
-    if use_indicators['intervals'][2] != "":
-        candles["candle" + use_indicators['intervals'][2]] = True
-    if use_indicators['intervals'][3] != "":
-        candles["candle" + use_indicators['intervals'][3]] = True      
+if use_indicators["enabled"]:
+    if use_indicators["intervals"][1] != "":
+        candles["candle" + use_indicators["intervals"][1]] = True
+    if use_indicators["intervals"][2] != "":
+        candles["candle" + use_indicators["intervals"][2]] = True
+    if use_indicators["intervals"][3] != "":
+        candles["candle" + use_indicators["intervals"][3]] = True
 
-# Callbacks
+
+# Public callbacks
 def on_message_public(raw):
     message = json.loads(raw)
     if message.get("event") in {"subscribe", "error"}:
@@ -919,6 +953,7 @@ def on_message_public(raw):
     elif ch in {"books", "books5", "bbo-tbt"}:
         handle_orderbook(message)
 
+# Keyed callbacks
 def on_message_business(raw):
     message = json.loads(raw)
     if message.get("event") in {"subscribe", "error"}:
@@ -930,15 +965,16 @@ def on_message_business(raw):
     # Klines and Trades
     ch = message.get("arg", {}).get("channel")
     if ch and ch.startswith("candle"):
-        interval = ch.replace('candle', '', 1)
-        if interval == use_indicators['intervals'][1]:
+        interval = ch.replace("candle", "", 1)
+        if interval == use_indicators["intervals"][1]:
             handle_kline(message, 1)
-        if interval == use_indicators['intervals'][2]:
+        if interval == use_indicators["intervals"][2]:
             handle_kline(message, 2)
-        if interval == use_indicators['intervals'][3]:
+        if interval == use_indicators["intervals"][3]:
             handle_kline(message, 3)
     elif ch == "trades-all":
         handle_trade(message)
+
 
 # Runner
 class Runner:
@@ -973,21 +1009,88 @@ class Runner:
             try:
                 await self.run_once()
             except Exception as e:
-                print(f"[{self.url}] Disconnected: {e}. Reconnecting in {backoff}s…")
+                defs.announce(f"[{self.url}] Disconnected: {e}. Reconnecting in {backoff}s…")
                 try:
-                    await asyncio.wait_for(self.stop_event.wait(), timeout=backoff)
+                    await asyncio.wait_for(
+                        self.stop_event.wait(), timeout=backoff
+                    )
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, 30)
             else:
                 backoff = 1
 
+
+# Helper to build runner list from current settings
+def build_runners():
+    runners = []
+
+    # Public WS (channels tickers + orderbook)
+    subs_public = []
+    subs_public.append({"channel": "tickers", "instId": symbol})
+    if use_orderbook["enabled"]:
+        subs_public.append({"channel": config.api_ch_orderbook, "instId": symbol})
+    if subs_public:
+        runners.append(
+            Runner(config.api_ws_public, subs_public, on_message_public)
+        )
+
+    # Business WS (channels candles + trades-all)
+    subs_business = []
+    for ch, enabled in candles.items():
+        if enabled:
+            subs_business.append({"channel": ch, "instId": symbol})
+    if use_trade["enabled"]:
+        subs_business.append({"channel": "trades-all", "instId": symbol})
+    if subs_business:
+        runners.append(
+            Runner(config.api_ws_business, subs_business, on_message_business)
+        )
+
+    return runners
+
 # Watchdog to stop when something goes wrong
-async def _watch_halt(runners, poll_ms=200):
+async def _watch_halt(state, poll_ms=200):
     while not defs.halt_sunflow:
         await asyncio.sleep(poll_ms / 1000.0)
-    for r in runners:
+    # On halt, stop whatever runners are current
+    for r in list(state["runners"]):
         r.stop()
+
+# Watcher that handles resubscribe cycles
+async def _watch_resubscribe(state):
+    while not getattr(defs, "halt_sunflow", False):
+        await resubmit_event.wait()
+        resubmit_event.clear()
+
+        # Stop existing runners
+        for r in list(state["runners"]):
+            r.stop()
+
+        # Give them a moment to unwind
+        await asyncio.sleep(0.1)
+
+        # Cancel old tasks
+        for t in list(state["tasks"]):
+            if not t.done():
+                t.cancel()
+        state["tasks"].clear()
+
+        # Rebuild runners and tasks from live config
+        new_runners = build_runners()
+        if not new_runners:
+            defs.log_error("Error: Resubscribe attempted but no streams enabled. Check settings.")
+            continue
+
+        state["runners"].clear()
+        state["runners"].extend(new_runners)
+
+        new_tasks = [asyncio.create_task(r.run_forever()) for r in new_runners]
+        state["tasks"].extend(new_tasks)
+
+        # Report to stdout
+        defs.announce("*** Websocket streams resubscribed ***")
+
 
 # Run tasks on a periodic basis
 async def _housekeeping_loop(poll_ms=200):
@@ -995,66 +1098,60 @@ async def _housekeeping_loop(poll_ms=200):
         current_time = defs.now_utc()[4]
 
         # Uptime ping
-        if current_time - uptime_ping['time'] > uptime_ping['delay']:
+        if current_time - uptime_ping["time"] > uptime_ping["delay"]:
             ping_message(current_time)
-            uptime_ping['time'] = current_time
+            uptime_ping["time"] = current_time
 
         # Periodic tasks
-        if periodic.get('enabled') and (current_time - periodic['time'] > periodic['delay']):
+        if periodic.get("enabled") and (
+            current_time - periodic["time"] > periodic["delay"]
+        ):
             periodic_tasks(current_time)
-            periodic['time'] = current_time
+            periodic["time"] = current_time
 
         await asyncio.sleep(poll_ms / 1000.0)
 
-# Main
+
+### Main ###
 async def main():
-    runners = []
 
-    # Public WS (channels tickers + orderbook)
-    subs_public = []
-    subs_public.append({"channel": "tickers", "instId": symbol})
-    if use_orderbook['enabled']:
-        subs_public.append({"channel": config.api_ch_orderbook, "instId": symbol})
-    if subs_public:
-        runners.append(Runner(config.api_ws_public, subs_public, on_message_public))
-
-    # Business WS (channels candles + trades-all)
-    subs_business = []
-    for ch, enabled in candles.items():
-        if enabled:
-            subs_business.append({"channel": ch, "instId": symbol})
-    if use_trade['enabled']:
-        subs_business.append({"channel": "trades-all", "instId": symbol})
-    if subs_business:
-        runners.append(Runner(config.api_ws_business, subs_business, on_message_business))
-
+    # Build initial runners
+    runners = build_runners()
     if not runners:
         raise RuntimeError("No streams enabled. Turn on at least one in settings.")
 
+    # Create tasks for runners
     tasks = [asyncio.create_task(r.run_forever()) for r in runners]
-    
+
+    # Seed global state for watchers
+    _state["runners"] = runners
+    _state["tasks"] = tasks
+
     # Start halt watchdog
-    halt_task = asyncio.create_task(_watch_halt(runners))    
-    
+    halt_task = asyncio.create_task(_watch_halt(_state))
+
+    # Start resubscribe watcher
+    resub_task = asyncio.create_task(_watch_resubscribe(_state))
+
     # Start housekeeping
     hk_task = asyncio.create_task(_housekeeping_loop())
 
     try:
-        await asyncio.gather(*(tasks + [halt_task, hk_task]))
+        await asyncio.gather(*(tasks + [halt_task, resub_task, hk_task]))
     except KeyboardInterrupt:
-        for r in runners:
+        for r in _state["runners"]:
             r.stop()
         await asyncio.sleep(0.1)
     finally:
-        for t in tasks:
+        for t in list(_state["tasks"]):
             if not t.done():
                 t.cancel()
-        if not halt_task.done():
-            halt_task.cancel()
-        if not hk_task.done():
-            hk_task.cancel()
+        for t in (halt_task, resub_task, hk_task):
+            if not t.done():
+                t.cancel()
 
-# Start
+
+### Start ###
 if __name__ == "__main__":
     asyncio.run(main())
 
