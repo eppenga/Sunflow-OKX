@@ -399,7 +399,7 @@ def get_order(orderid):
             defs.log_exchange(response, message)
 
         # Check response for errors
-        result = check_response(response, True)
+        result     = check_response(response, True)
         error_code = result[4]
         error_msg  = result[5]
 
@@ -467,7 +467,7 @@ def get_linked_order(linkedid):
             defs.log_exchange(response, message)
 
         # Check response for errors
-        result = check_response(response, True)
+        result    = check_response(response, True)
         error_code = result[4]
         error_msg  = result[5]
 

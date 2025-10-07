@@ -138,23 +138,23 @@ def now_utc():
     
     return timestamp_0, timestamp_1, timestamp_2, timestamp_3, timestamp_4, timestamp_5, timestamp_6
 
-# Log all responses from exchange
-def log_exchange(response, message):
+# Log all responses from exchange, for debug purposes add full_log to the call
+def log_exchange(response, message, full_log=False):
     
     # Debug
     debug = False
     
     # Initialize variables
     to_log        = ""
-    response_nice = {}
+    response_full = {}
     
     # Create log message   
     to_log = message + "\n"
     
     # Extend log message based on error level
-    if config.exchange_log_full:
-        response_nice = pprint.pformat(response)
-        to_log = message + "\n" + response_nice + "\n\n"
+    if config.exchange_log_full or full_log:
+        response_full = pprint.pformat(response)
+        to_log        = message + "\n" + response_full + "\n\n"
     
     # Write to exchange log file
     if config.exchange_log:    

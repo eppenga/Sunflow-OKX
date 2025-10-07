@@ -3,3 +3,4 @@ pytz
 websockets
 pandas
 pandas-ta
+websockets

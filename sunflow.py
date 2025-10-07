@@ -3,9 +3,8 @@
 # File that drives it all! 
 
 # Load external libraries
-from time import sleep
 from pathlib import Path
-import asyncio, argparse, contextlib, importlib, json, pprint, sys, time, traceback
+import asyncio, argparse, contextlib, importlib, json, pprint, sys, time, traceback, websockets
 import pandas as pd
 
 # Load internal libraries
@@ -221,7 +220,6 @@ def handle_ticker(message):
 
         # Initialize variables
         ticker              = {}
-        response            = {}
         result              = ()
         error_code          = 0
         error_msg           = ""
@@ -339,11 +337,7 @@ def handle_ticker(message):
             # Amend existing sell trailing order if required
             if active_order['active'] and active_order['side'] == "Sell":
 
-                # Only amend order if the quantity to be sold has changed
-                defs.announce(f"Debug: Trying to amend quantity sell, {active_order['qty_new']} >= {info['minOrderQty']}")
-                pprint.pprint(active_order)
-                print(info['minOrderQty'])
-                print()
+                # Only amend order if the quantity to be sold has changed and is below threshold
                 if (active_order['qty_new'] != active_order['qty']) and (active_order['qty_new'] >= info['minOrderQty']):
 
                     # Amend order quantity
@@ -882,11 +876,11 @@ def ping_message(current_time):
         # Reset uptime notice
         uptime_ping['time']   = current_time
         uptime_ping['record'] = current_time
-        
+
         # Report to stdout
         message = f"*** Warning: Ping, last ticker update of {delay_tickers:,} ms ago is larger than {expire:,} ms maximum! ***"
         defs.log_error(message)
-        
+
         # Request resubscribe
         message = f"Ticker stall: Last update {delay_tickers:,} ms > {expire:,} ms"
         request_resubscribe(message)
@@ -913,16 +907,15 @@ _state = {"runners": [], "tasks": []}
 
 # Announce once and signal the watcher to rebuild streams
 def request_resubscribe(reason: str = ""):
-    
     # Report to stdout
     if reason:
         defs.announce(f"*** Warning: Websocket resubscribe: {reason} ***")
     else:
-        defs.announce( "*** Warning: Websocket resubscribe ***")
+        defs.announce("*** Warning: Websocket resubscribe ***")
 
     # Resubmit event set
     resubmit_event.set()
-    
+
     # Return
     return
 
@@ -935,7 +928,6 @@ if use_indicators["enabled"]:
         candles["candle" + use_indicators["intervals"][2]] = True
     if use_indicators["intervals"][3] != "":
         candles["candle" + use_indicators["intervals"][3]] = True
-
 
 # Public callbacks
 def on_message_public(raw):
@@ -994,10 +986,10 @@ class Runner:
             await ws.subscribe(self.subs, self.callback)
             await self.stop_event.wait()
         except Exception as e:
-            print(f"[{self.url}] run_once crashed: {e}")
+            defs.announce(f"[{self.url}] run_once crashed: {e}")
             raise
         finally:
-            # Always try to clean up, even if we crashed
+            # Always try to clean up
             with contextlib.suppress(Exception):
                 await ws.unsubscribe(self.subs)
             with contextlib.suppress(Exception):
@@ -1011,9 +1003,7 @@ class Runner:
             except Exception as e:
                 defs.announce(f"[{self.url}] Disconnected: {e}. Reconnecting in {backoff}s…")
                 try:
-                    await asyncio.wait_for(
-                        self.stop_event.wait(), timeout=backoff
-                    )
+                    await asyncio.wait_for(self.stop_event.wait(), timeout=backoff)
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, 30)
@@ -1031,9 +1021,7 @@ def build_runners():
     if use_orderbook["enabled"]:
         subs_public.append({"channel": config.api_ch_orderbook, "instId": symbol})
     if subs_public:
-        runners.append(
-            Runner(config.api_ws_public, subs_public, on_message_public)
-        )
+        runners.append(Runner(config.api_ws_public, subs_public, on_message_public))
 
     # Business WS (channels candles + trades-all)
     subs_business = []
@@ -1043,11 +1031,53 @@ def build_runners():
     if use_trade["enabled"]:
         subs_business.append({"channel": "trades-all", "instId": symbol})
     if subs_business:
-        runners.append(
-            Runner(config.api_ws_business, subs_business, on_message_business)
-        )
+        runners.append(Runner(config.api_ws_business, subs_business, on_message_business))
 
     return runners
+
+
+# Robust asyncio error handling & task logging
+def _log_task_result(task: asyncio.Task):
+
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        defs.log_error(f"*** Warning: Task crashed: {e} ***\n>>> Traceback: \n{tb}")
+        if isinstance(e, websockets.exceptions.ConnectionClosedError):
+            request_resubscribe("Runner task crashed with ConnectionClosedError")
+
+def _loop_exception_handler(loop, context):
+
+    msg = context.get("message", "Unhandled exception in event loop")
+    exc = context.get("exception")
+    task = context.get("task") or context.get("future")
+
+    parts = [f"*** Warning: {msg} ***"]
+    if task:
+        try:
+            tname = task.get_name()
+        except Exception:
+            tname = repr(task)
+        parts.append(f"task={tname}")
+
+    if exc:
+        if isinstance(exc, websockets.exceptions.ConnectionClosedError):
+            parts.append("exception=ConnectionClosedError (no close frame received or sent)")
+
+            # Trigger automatic resubscribe on connection close
+            request_resubscribe("Loop handler caught ConnectionClosedError")
+
+        else:
+            parts.append(f"exception={exc.__class__.__name__}: {exc}")
+
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        parts.append("Traceback:\n" + tb)
+
+    defs.log_error("\n>>> Message: ".join(parts))
+
 
 # Watchdog to stop when something goes wrong
 async def _watch_halt(state, poll_ms=200):
@@ -1079,13 +1109,16 @@ async def _watch_resubscribe(state):
         # Rebuild runners and tasks from live config
         new_runners = build_runners()
         if not new_runners:
-            defs.log_error("Error: Resubscribe attempted but no streams enabled. Check settings.")
+            defs.log_error("*** Error: Resubscribe attempted, but no streams enabled. Check settings. ***")
             continue
 
         state["runners"].clear()
         state["runners"].extend(new_runners)
 
-        new_tasks = [asyncio.create_task(r.run_forever()) for r in new_runners]
+        new_tasks = [asyncio.create_task(r.run_forever(), name=f"runner-{i}") for i, r in enumerate(new_runners)]
+        for t in new_tasks:
+            t.add_done_callback(_log_task_result)
+
         state["tasks"].extend(new_tasks)
 
         # Report to stdout
@@ -1115,26 +1148,35 @@ async def _housekeeping_loop(poll_ms=200):
 ### Main ###
 async def main():
 
+    # Loop exception handler
+    loop = asyncio.get_running_loop()
+    loop.set_exception_handler(_loop_exception_handler)
+
     # Build initial runners
     runners = build_runners()
     if not runners:
         raise RuntimeError("No streams enabled. Turn on at least one in settings.")
 
     # Create tasks for runners
-    tasks = [asyncio.create_task(r.run_forever()) for r in runners]
+    tasks = [asyncio.create_task(r.run_forever(), name=f"runner-{i}") for i, r in enumerate(runners)]
+    for t in tasks:  # NEW: attach crash logger
+        t.add_done_callback(_log_task_result)
 
     # Seed global state for watchers
     _state["runners"] = runners
     _state["tasks"] = tasks
 
     # Start halt watchdog
-    halt_task = asyncio.create_task(_watch_halt(_state))
+    halt_task = asyncio.create_task(_watch_halt(_state), name="watch-halt")
+    halt_task.add_done_callback(_log_task_result)
 
     # Start resubscribe watcher
-    resub_task = asyncio.create_task(_watch_resubscribe(_state))
+    resub_task = asyncio.create_task(_watch_resubscribe(_state), name="watch-resub")
+    resub_task.add_done_callback(_log_task_result)
 
     # Start housekeeping
-    hk_task = asyncio.create_task(_housekeeping_loop())
+    hk_task = asyncio.create_task(_housekeeping_loop(), name="housekeeping")
+    hk_task.add_done_callback(_log_task_result)
 
     try:
         await asyncio.gather(*(tasks + [halt_task, resub_task, hk_task]))

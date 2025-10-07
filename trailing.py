@@ -174,7 +174,7 @@ def check_spike(spot, active_order, order, all_buys, info):
 def calculate_revenue(order, all_sells, spot, info):
     
     # Debug and speed
-    debug = False
+    debug = True
     speed = True
     stime = defs.now_utc()[4]
     
@@ -191,7 +191,6 @@ def calculate_revenue(order, all_sells, spot, info):
     sells         = order['cumExecValue']
     buys          = sum(item['cumExecValue'] for item in all_sells)
     fees['buy']   = sum(item['cumExecFee'] for item in all_sells) * spot
-    fees['buy']   = defs.round_number(fees['buy'], info['quotePrecision'], "down")
     fees['sell']  = order['cumExecFee']
     fees['total'] = fees['buy'] + fees['sell']
     revenue       = sells - buys - fees['total']
@@ -208,6 +207,13 @@ def calculate_revenue(order, all_sells, spot, info):
         message += f"fees {fees['total']} {info['quoteCoin']} and therefore "
         message += f"profit is {revenue} {info['quoteCoin']}"
         defs.announce(message)
+
+    # *** CHECK *** TEMP
+    print("Sell order")
+    pprint.pprint(order)
+    print("\nMatching buy orders")
+    pprint.pprint(all_sells)
+    print()
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -260,7 +266,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
 
     # Glue order and fills together
     order = orders.merge_order_fills(order, fills, info)
-    defs.announce(f"Merged order {active_order['orderid']} with fills from linked order {active_order['linkedid']}")
+    defs.announce(f"Merged order {active_order['orderid']} with linked TP/SL order {active_order['linkedid']}")
 
     # Set Sunflow order status to Closed
     order['status'] = "Closed"
