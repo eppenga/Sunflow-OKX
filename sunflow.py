@@ -1074,7 +1074,8 @@ def _loop_exception_handler(loop, context):
             parts.append(f"exception={exc.__class__.__name__}: {exc}")
 
         tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-        parts.append("Traceback:\n" + tb)
+        # *** CHECK *** Do not report the full traceback for now        
+        # parts.append("Traceback:\n" + tb)
 
     defs.log_error("\n>>> Message: ".join(parts))
 
