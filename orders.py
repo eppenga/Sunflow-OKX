@@ -13,7 +13,7 @@ import database, defs, exchange, distance, preload
 config = load_config()
 
 # Get order details
-def get_order(orderid):
+def get_order(orderid, skip=False):
     
     # Debug and speed
     debug = False
@@ -28,7 +28,7 @@ def get_order(orderid):
     error_msg  = ""
 
     # Get response from exchange
-    result     = exchange.get_order(orderid)
+    result     = exchange.get_order(orderid, skip)
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]

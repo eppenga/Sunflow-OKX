@@ -302,7 +302,7 @@ def check_orders(all_buys, info):
             temp_order = order
             if order['status'] != "Closed":
                 defs.announce("Performing an additional check on order status via exchange")
-                result     = orders.get_order(order['orderid'])
+                result     = orders.get_order(order['orderid'], True)
                 temp_order = result[0]
                 error_code = result[1]
                 error_msg  = result[2]

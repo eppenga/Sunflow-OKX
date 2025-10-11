@@ -364,7 +364,7 @@ def place_order(active_order):
     return response, error_code, error_msg
 
 # Get order
-def get_order(orderid):
+def get_order(orderid, skip=False):
 
     # Debug
     debug = False
@@ -402,11 +402,16 @@ def get_order(orderid):
         result     = check_response(response, True)
         error_code = result[4]
         error_msg  = result[5]
+        
+        # Starting up, no need for extensive checking
+        if skip: break
 
-        # Check if order does not yet exist, it's sometimes delayed
-        if error_code == 51603: 
+        # 51603 - Order does not exist
+        if error_code == 51603:
             recheck = True
-            defs.announce(f"Rechecking get_order(), maybe it's delayed, attempt {attempt + 1} / 10")
+            defs.announce(f"Rechecking order {orderid}, maybe it's delayed, attempt {attempt + 1} / 10")
+            pprint.pprint(response)
+            print()
             time.sleep(1 + attempt)
        
         # Check API rate limit, if hit then True
@@ -474,7 +479,7 @@ def get_linked_order(linkedid):
         # Check if order is already filled, it's sometimes delayed
         if (response['code'] != '0') and (response['data'][0]['state'] != 'filled'):
             recheck = True
-            defs.announce(f"Rechecking get_linked_order(), maybe it's delayed, attempt {attempt + 1} / 10")
+            defs.announce(f"Rechecking linked order {linkedid}, maybe it's delayed, attempt {attempt + 1} / 10")
             time.sleep(1 + attempt)
        
         # Check API rate limit, if hit then True

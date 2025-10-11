@@ -73,6 +73,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         if error_code != 0:
             message = f"*** Error: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
+            return active_order, all_buys, compounding            
             
         # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process
         if order['orderStatus'] == "Effective":
@@ -478,6 +479,20 @@ def atp_helper(active_order, all_buys, all_sells, compounding, spot, info):
         message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
         active_order['trigger'] = active_order['trigger_new']        
+
+    elif error_code in (51278, 51527):  # 51278 - SL trigger price cannot be lower than the last price
+                                        # 51527 - Order modification failed. At least 1 of the attached TP/SL orders does not exist
+    
+        # 51278 - Price dropped to quickly and then probably shot back up
+        # 51527 - Order probably got filled in between
+        message = f"*** Warning: Trailing can't keep up, checking if order {active_order['orderid']} is filled ***\n>>> Message: {error_code} - {error_msg}"
+        defs.announce(message)
+        
+        # Check the order, maybe it was filled in the meantime
+        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
+        active_order = result[0]
+        all_buys     = result[1]
+        compounding  = result[2]
 
     elif error_code == -1:  # Enter any error_code here you would like specific actions
     
