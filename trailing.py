@@ -19,7 +19,7 @@ stuck['time']     = defs.now_utc()[4]
 stuck['interval'] = config.stuck_interval
   
 # Check if we can do trailing buy or sell
-def check_order(spot, compounding, active_order, all_buys, all_sells, info):
+def check_order(spot, compounding, active_order, all_buys, all_sells, info, force_check=False):
 
     # Debug and speed
     debug = False
@@ -32,9 +32,10 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     # Initialize variables
     result         = ()
     type_check     = ""
+    fill_manual    = False
     do_check_order = False
-    error_code  = 0
-    error_msg   = ""
+    error_code     = 0
+    error_msg      = ""
 
     # Has current price crossed trigger price
     if active_order['side'] == "Sell":
@@ -55,6 +56,10 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         type_check = "an additional"
         do_check_order = True
 
+    # Apply forced check
+    if force_check: 
+        do_check_order = True
+
     # Current price crossed trigger price or periodic check
     if do_check_order:
 
@@ -70,13 +75,23 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
         order        = result[0]
         error_code   = result[1]
         error_msg    = result[2]
-        if error_code != 0:
+        
+        # Check exchange errors
+        if error_code == 51603:
+            
+            # Exchange is lagging
+            defs.announce(f"*** Warning: Exchange did not provide info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
+            fill_manual = True
+        
+        elif error_code !=0 :
+            
+            # Any other error
             message = f"*** Error: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
-            return active_order, all_buys, compounding            
             
+
         # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process
-        if order['orderStatus'] == "Effective":
+        if fill_manual or order['orderStatus'] == "Effective":
             
             # Prepare message for stdout
             defs.announce(f"*** Trailing {active_order['side'].lower()} order has been filled! ***")
@@ -84,7 +99,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
             message += f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
             
             # Close trailing process
-            result       = close_trail(active_order, all_buys, all_sells, spot, info)
+            result       = close_trail(active_order, all_buys, all_sells, spot, info, fill_manual)
             active_order = result[0]
             all_buys     = result[1]
             all_sells    = result[2]
@@ -112,7 +127,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
             
         # Check if symbol is spiking
         else:
-            result       = check_spike(spot, active_order, order, all_buys, info)
+            result       = check_spike(active_order, order, all_buys, spot, info)
             active_order = result[0]
             all_buys     = result[1]
 
@@ -123,7 +138,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info):
     return active_order, all_buys, compounding
 
 # Checks if the trailing error spiked, order price is either below or above spot depending on side
-def check_spike(spot, active_order, order, all_buys, info):
+def check_spike(active_order, order, all_buys, spot, info):
 
     # Debug and speed
     debug = False
@@ -133,36 +148,28 @@ def check_spike(spot, active_order, order, all_buys, info):
     # Initialize variables
     error_code   = 0
     spike_margin = config.spike_margin
+    remove_order = False
 
     # Check if the order spiked
     if active_order['side'] == "Sell":
-
-        # Did it spike and was forgotten when selling
         if order['triggerPrice'] > spot * (1 + (spike_margin / 100)):
-            defs.announce("*** Warning: Sell order spiked, cancelling current order! ***")
+            remove_order = True
            
-            # Remove order from Sunflow
-            result       = database.remove(active_order, all_buys, info)
-            active_order = result[0]
-            all_buys     = result[1]
-            error_code   = result[2]
-            error_msg    = result[3]
-
     elif active_order['side'] == "Buy":
-
-        # Did it spike and was forgotten when buying
         if order['triggerPrice'] < spot * (1 - (spike_margin / 100)):
-            defs.announce("*** Warning: Buy order spiked, cancelling current order! ***")
-            
-            # Remove order from Sunflow
-            result       = database.remove(active_order, all_buys, info)
-            active_order = result[0]
-            all_buys     = result[1]
-            error_code   = result[2]
-            error_msg    = result[3]
+            remove_order = True           
+
+    # Remove order from Sunflow if needed
+    if remove_order:
+        defs.announce(f"*** Warning: {active_order['side']} order spiked, cancelling current order! ***")
+        result       = database.remove(active_order, all_buys, info)
+        active_order = result[0]
+        all_buys     = result[1]
+        error_code   = result[2]
+        error_msg    = result[3]           
     
     if error_code != 0:
-        message = f"*** Warning: Order '{active_order['orderid']}' spiked! ***\n>>> Message: {error_code} - {error_msg}"
+        message = f"*** Warning: Failed to remove spiked order '{active_order['orderid']}' ! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
     # Report execution time
@@ -175,7 +182,7 @@ def check_spike(spot, active_order, order, all_buys, info):
 def calculate_revenue(order, all_sells, spot, info):
     
     # Debug and speed
-    debug = True
+    debug = False
     speed = True
     stime = defs.now_utc()[4]
     
@@ -204,27 +211,29 @@ def calculate_revenue(order, all_sells, spot, info):
     
     # Report to stdout for debug
     if debug:
+        
+        # Standard message
         message  = f"Sold {sells} {info['quoteCoin']}, bought {buys} {info['quoteCoin']}, "
         message += f"fees {fees['total']} {info['quoteCoin']} and therefore "
         message += f"profit is {revenue} {info['quoteCoin']}"
         defs.announce(message)
 
-    # *** CHECK *** TEMP
-    print("Sell order")
-    pprint.pprint(order)
-    print("\nMatching buy orders")
-    pprint.pprint(all_sells)
-    print()
+        # Extended message
+        print("Sell order")
+        pprint.pprint(order)
+        print("\nMatching buy orders")
+        pprint.pprint(all_sells)
+        print()
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
     
     # Return revenue
     return revenue
-    
-# Trailing order does not exist anymore, close it
-def close_trail(active_order, all_buys, all_sells, spot, info):
 
+# Do registrations and calculate revenue for close_trail()
+def close_trail_register(order, all_buys, all_sells, spot, info):
+    
     # Debug and speed
     debug = False
     speed = True
@@ -232,46 +241,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
     
     # Initialize variables
     revenue = 0
-    
-    # Make active_order inactive
-    active_order['active'] = False
-    
-    # Get buy or sell order
-    result     = orders.get_order(active_order['orderid']) 
-    order      = result[0]
-    error_code = result[1]
-    error_msg  = result[2]
-    if error_code != 0:
-        message = f"*** Error: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
-        defs.log_error(message)
-        return active_order, all_buys, all_sells, order, revenue
 
-    # Add linked order to active_order
-    active_order['linkedid'] = order['linkedid']
-    
-    # Debug to stdout
-    if debug:
-        defs.announce(f"Active order data:")
-        pprint.pprint(active_order)
-        print()
-
-    # Get fills for the closed order   
-    result     = orders.get_linked_order(active_order['linkedid'])
-    fills      = result[0]
-    error_code = result[1]
-    error_msg  = result[2]
-    if error_code != 0:
-        message = f"*** Error: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
-        defs.log_error(message)
-        return active_order, all_buys, all_sells, order, revenue
-
-    # Glue order and fills together
-    order = orders.merge_order_fills(order, fills, info)
-    defs.announce(f"Merged order {active_order['orderid']} with linked TP/SL order {active_order['linkedid']}")
-
-    # Set Sunflow order status to Closed
-    order['status'] = "Closed"
-          
     # Order was bought, create new all buys database
     if order['side'] == "Buy":
         all_buys = database.register_buy(order, all_buys, info)
@@ -291,6 +261,77 @@ def close_trail(active_order, all_buys, all_sells, spot, info):
     # Rebalance new database
     if config.database_rebalance:
         all_buys = orders.rebalance(all_buys, info)
+
+    # Report execution time
+    if speed: defs.announce(defs.report_exec(stime))
+
+    # Return data
+    return all_buys, all_sells, revenue
+    
+# Trailing order does not exist anymore, close it
+def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False):
+
+    # Debug and speed
+    debug = False
+    speed = True
+    stime = defs.now_utc()[4]
+    
+    # Initialize variables
+    revenue = 0
+    order   = {}
+    
+    # Make active_order inactive and preset linkedid
+    active_order['active']   = False
+    active_order['linkedid'] = "-1"
+    
+    # Create order manually if exchange failed
+    if fill_manual:
+        order = orders.create_manual_order(active_order, info)
+
+    # Query exchange on real orders
+    if not fill_manual:
+    
+        # Get buy or sell order
+        result     = orders.get_order(active_order['orderid']) 
+        order      = result[0]
+        error_code = result[1]
+        error_msg  = result[2]
+        if error_code != 0:
+            message = f"*** Error: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            defs.log_error(message)
+            return active_order, all_buys, all_sells, order, revenue
+
+        # Add linked order to active_order
+        active_order['linkedid'] = order['linkedid']
+    
+        # Debug to stdout
+        if debug:
+            defs.announce(f"Active order data:")
+            pprint.pprint(active_order)
+            print()
+
+        # Get fills for the closed order   
+        result     = orders.get_linked_order(order['linkedid'])
+        fills      = result[0]
+        error_code = result[1]
+        error_msg  = result[2]
+        if error_code != 0:
+            message = f"*** Error: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            defs.log_error(message)
+            return active_order, all_buys, all_sells, order, revenue
+
+        # Glue order and fills together
+        order = orders.merge_order_fills(order, fills, info)
+        defs.announce(f"Merged order {active_order['orderid']} with linked TP/SL order {active_order['linkedid']}")
+
+        # Set Sunflow order status to Closed
+        order['status'] = "Closed"
+          
+    # Register in database and calculate revenue
+    result    = close_trail_register(order, all_buys, all_sells, spot, info)
+    all_buys  = result[0]
+    all_sells = result[1]
+    revenue   = result[2]
 
     # Report to stdout
     defs.announce(f"Closed trailing {active_order['side'].lower()} order")
@@ -356,7 +397,7 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
 
         # Amend trigger price
         if do_amend:
-            result       = atp_helper(active_order, all_buys, all_sells, compounding, spot, info)
+            result       = adjust_tp(active_order, all_buys, all_sells, compounding, spot, info)
             active_order = result[0]
             all_buys     = result[1]
             all_sells    = result[2]
@@ -369,16 +410,17 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
     return active_order, all_buys, compounding, info
 
 # Change trigger price current trailing sell helper
-def aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info):
+def adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info):
 
     # Initialize variables
-    debug       = False
-    result      = ()
-    error_code  = 0
-    error_msg   = ""
+    debug      = False
+    go_check   = False
+    result     = ()
+    error_code = 0
+    error_msg  = ""
 
     # Amend order quantity
-    result      = amend_qty_sell(active_order, info)
+    result      = adjust_qty_order(active_order, info)
     response    = result[0]
     error_code  = result[1]
     error_msg   = result[2]
@@ -387,23 +429,26 @@ def aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info):
     if error_code == 0:
 
         # Everything went fine, we can continue trailing
-        active_order['qty'] = active_order['qty_new']
         message  = f"Adjusted quantity from {defs.format_number(active_order['qty'], info['basePrecision'])} "
         message += f"to {defs.format_number(active_order['qty_new'], info['basePrecision'])} {info['baseCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
+        active_order['qty']     = active_order['qty_new']
+        active_order['updated'] = defs.now_utc()[4]
         all_sells = all_sells_new
 
-    elif error_code == -1:  # Enter any error_code here you would like specific actions
+    elif error_code == 51603:
+        
+        # 51603 - Order does not exist (Maybe the order was filled in between)
+        go_check = True
+        message  = f"*** Warning: Failed to adjust quantity for order {active_order['orderid']}, checking order ***\n>>> Message: {error_code} - {error_msg}"
+        defs.announce(message)
+
+    elif error_code == -1:  # Enter any error_code here you would like specific actions for
     
         # Comment what is going wrong
-        message = f"*** Warning: Your warning message ***\n>>> Message: {error_code} - {error_msg}"
+        go_check = True
+        message  = f"*** Warning: Your warning message ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
-        
-        # Check the order, maybe it was filled in the meantime
-        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
-        active_order = result[0]
-        all_buys     = result[1]
-        compounding  = result[2]   
        
     else:
 
@@ -411,11 +456,18 @@ def aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info):
         message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
+    # Check order to be sure
+    if go_check:
+        result       = check_order(spot, compounding, active_order, all_buys, all_sells, info, True)
+        active_order = result[0]
+        all_buys     = result[1]
+        compounding  = result[2]
+    
     # Return data
     return active_order, all_sells, all_sells_new, compounding
 
 # Change the quantity of the current trailing sell
-def amend_qty_sell(active_order, info):
+def adjust_qty_order(active_order, info):
 
     # Debug and speed
     debug = False
@@ -456,17 +508,18 @@ def amend_qty_sell(active_order, info):
     return response, error_code, error_msg
 
 # Change quantity trailing sell helper
-def atp_helper(active_order, all_buys, all_sells, compounding, spot, info):
+def adjust_tp(active_order, all_buys, all_sells, compounding, spot, info):
 
     # Initialize variables
     debug      = False
+    go_check   = False    
     result     = ()
     response   = {}
     error_code = 0
-    error_msg = ""
+    error_msg  = ""
     
     # Amend trigger price
-    result     = amend_trigger_price(active_order, info)
+    result     = adjust_tp_order(active_order, info)
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
@@ -478,45 +531,42 @@ def atp_helper(active_order, all_buys, all_sells, compounding, spot, info):
         message  = f"Adjusted trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
         message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} in {active_order['side'].lower()} order"
         defs.announce(message)
-        active_order['trigger'] = active_order['trigger_new']        
+        active_order['trigger'] = active_order['trigger_new']
+        active_order['updated'] = defs.now_utc()[4]
 
-    elif error_code in (51278, 51527):  # 51278 - SL trigger price cannot be lower than the last price
-                                        # 51527 - Order modification failed. At least 1 of the attached TP/SL orders does not exist
+    elif error_code in (51278, 51527):
     
-        # 51278 - Price dropped to quickly and then probably shot back up
-        # 51527 - Order probably got filled in between
-        message = f"*** Warning: Trailing can't keep up, checking if order {active_order['orderid']} is filled ***\n>>> Message: {error_code} - {error_msg}"
+        # 51278 - SL trigger price cannot be lower than the last price (Price dropped to quickly and then probably shot back up)
+        # 51527 - Order modification failed. At least 1 of the attached TP/SL orders does not exist (Order probably got filled in between)
+        go_check = True
+        message  = f"*** Warning: Failed to adjust trigger price for order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
         
-        # Check the order, maybe it was filled in the meantime
-        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
-        active_order = result[0]
-        all_buys     = result[1]
-        compounding  = result[2]
-
-    elif error_code == -1:  # Enter any error_code here you would like specific actions
+    elif error_code == -1:  # Enter any error_code here you would like specific actions for
     
         # Comment what is going wrong
+        go_check = True
         message = f"*** Warning: Your warning message ***\n>>> Message: {error_code} - {error_msg}"
         defs.announce(message)
-        
-        # Check the order, maybe it was filled in the meantime
-        result = check_order(spot, compounding, active_order, all_buys, all_sells, info)
-        active_order = result[0]
-        all_buys     = result[1]
-        compounding  = result[2]
-    
+            
     else:
 
         # Critical error, log and exit
         message = f"*** Error: Critical failure while trailing! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
+
+    # Check order to be sure
+    if go_check:
+        result       = check_order(spot, compounding, active_order, all_buys, all_sells, info, True)
+        active_order = result[0]
+        all_buys     = result[1]
+        compounding  = result[2]
     
     # Return active_order
     return active_order, all_buys, all_sells, compounding
 
 # Change the trigger price of the current trailing sell
-def amend_trigger_price(active_order, info):
+def adjust_tp_order(active_order, info):
 
     # Debug and speed
     debug = False

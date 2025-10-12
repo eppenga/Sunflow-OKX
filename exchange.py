@@ -292,6 +292,54 @@ def get_balance(currency):
     # Return data
     return response, error_code, error_msg
 
+# Get fee rates
+def get_fees():
+
+    # Debug
+    debug = False
+    
+    # Initialize variables
+    response   = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False    
+
+    # Get response
+    for attempt in range(3):
+        message = defs.announce("session: accountAPI.get_fee_rates()")
+        try:
+            response = accountAPI.get_fee_rates(
+                instType = "SPOT",
+                instId   = config.symbol
+            )
+        except Exception as e:
+            message = f"*** Error: Failed to get fee rates from instrument ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result     = check_response(response)
+        error_code = result[4]
+        error_msg  = result[5]
+        
+        # Check API rate limit
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if not rate_limit: break      
+       
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+
 # Post order
 def place_order(active_order):
 
@@ -410,8 +458,6 @@ def get_order(orderid, skip=False):
         if error_code == 51603:
             recheck = True
             defs.announce(f"Rechecking order {orderid}, maybe it's delayed, attempt {attempt + 1} / 10")
-            pprint.pprint(response)
-            print()
             time.sleep(1 + attempt)
        
         # Check API rate limit, if hit then True
@@ -424,7 +470,8 @@ def get_order(orderid, skip=False):
     if not rate_limit and not recheck:
         if debug: defs.announce(f"Received details for order {orderid}")
     else:
-        defs.log_error(f"*** Warning: Failed to receive details for order {orderid} ***")
+        message = f"*** Warning: Failed to receive details for order {orderid} ***\n>>> Message: {error_code} - {error_msg}"
+        defs.log_error(message)
 
     # Debug to stdout
     if debug:
@@ -492,7 +539,8 @@ def get_linked_order(linkedid):
     if not rate_limit and not recheck:
         if debug: defs.announce(f"Received all fills for linked order {linkedid}")
     else:
-        defs.log_error(f"*** Warning: Failed to receive all fills for linked order {linkedid} ***")
+        message = f"*** Warning: Failed to receive details fills for linked order {linkedid} ***\n>>> Message: {error_code} - {error_msg}"
+        defs.log_error(message)
 
     # Debug to stdout
     if debug:

@@ -12,6 +12,53 @@ import database, defs, exchange, distance, preload
 # Load config
 config = load_config()
 
+# Create fake manual order in case exchange is not providing
+def create_manual_order(active_order, info):
+
+    # Debug
+    debug = True
+    
+    # Initialize variables
+    order = {}
+      
+    # Set order
+    order['avgPrice']     = active_order['current']
+    order['createdTime']  = active_order['created']
+    order['linkedid']     = "-1"
+    order['orderid']      = active_order['orderid']
+    order['orderStatus']  = "Effective"
+    order['orderType']    = "Conditional"
+    order['qty']          = active_order['qty']
+    order['side']         = active_order['side']
+    order['status']       = "Closed"
+    order['symbol']       = info['symbol']
+    order['triggerPrice'] = active_order['trigger']
+    order['updatedTime']  = defs.now_utc()[4]
+                 
+    # Set cumulative quantity and value
+    order['cumExecQty']   = order['qty']
+    order['cumExecValue'] = order['qty'] * order['avgPrice']
+    
+    # Set cumulative fees
+    if active_order['side'] == "Buy":
+        order['cumExecFeeCcy'] = info['baseCoin']
+        order['cumExecFee']    = order['cumExecQty'] * info['feeTaker']
+        
+    elif active_order['side'] == "Sell":
+        order['cumExecFeeCcy'] = info['quoteCoin']
+        order['cumExecFee']    = order['cumExecValue'] * info['feeTaker']
+    
+    if debug:
+        defs.announce(f"Debug: Order {active_order['orderid']} fill data was set manually")
+        print("active_order")
+        pprint.pprint(active_order)
+        print("\norder")
+        pprint.pprint(order)
+        print()
+        
+    # Return manually created order
+    return order
+
 # Get order details
 def get_order(orderid, skip=False):
     
@@ -146,7 +193,6 @@ def decode_order(response):
     order['side']          = result['side'].capitalize()                    # Buy or Sell
     order['orderType']     = result['ordType'].capitalize()                 # Order type: Market, Limit, etc...
     order['orderStatus']   = result['state'].capitalize()                   # Order state: Live, Pause, Partially_effective, Effective, Canceled, Order_failed, Partially_failed
-    order['price']         = float(result.get('last'))                      # Last price available in quote (USDT)
     order['qty']           = float(result.get('sz'))                        # Quantity in base (BTC)
     order['triggerPrice']  = float(result.get('slTriggerPx'))               # Trigger price in quote (USDT)
     order['avgPrice']      = 0                                              # Average fill price in quote (USDT)
@@ -362,6 +408,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     active_order['start']    = spot
     active_order['previous'] = spot
     active_order['current']  = spot
+    active_order['created']  = defs.now_utc()[4]
     active_order['orderid']  = ""
     
     # Determine distance of trigger price
@@ -377,18 +424,18 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     error_msg  = result[2]
 
     # Check if buy error was successsful
-    if error_code != 0:
-
+    if error_code !=0:
+        
         # Reset active_order
         active_order['active'] = False
-        
+
         # Report error
-        message = f"*** Warning: Buy order failed when placing, trailing stopped! ***\n>>> Message: {error_code} - {error_msg}"
+        message = f"*** Warning: Buy order failed when placing, trailing stopped! ****\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
         # Return
-        if speed: defs.announce(defs.report_exec(stime))    
-        return active_order, all_buys, info
+        if speed: defs.announce(defs.report_exec(stime))        
+        return active_order
 
     # Get order ID
     active_order['orderid'] = int(order['data'][0]['algoId'])
@@ -398,7 +445,11 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     order      = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
+
+    # Order does not exist, assume it was filled
+    if error_code == 51603:
+        pass
+   
     # Check if the order we just placed was fine
     if error_code !=0:
         
@@ -459,6 +510,7 @@ def sell(spot, active_order, prices, info):
     active_order['start']    = spot
     active_order['previous'] = spot
     active_order['current']  = spot
+    active_order['created']  = defs.now_utc()[4]
     active_order['orderid']  = ""
   
     # Determine distance of trigger price
@@ -480,7 +532,7 @@ def sell(spot, active_order, prices, info):
         active_order['active'] = False
 
         # Report error
-        message = f"*** Warning: Buy order failed when placing, trailing stopped! ****\n>>> Message: {error_code} - {error_msg}"
+        message = f"*** Warning: Sell order failed when placing, trailing stopped! ****\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
 
         # Return
@@ -496,6 +548,10 @@ def sell(spot, active_order, prices, info):
     error_code = result[1]
     error_msg  = result[2]
     
+    # Order does not exist, assume it was filled
+    if error_code == 51603:
+        pass
+
     # Check if the order we just placed was fine
     if error_code !=0:
         

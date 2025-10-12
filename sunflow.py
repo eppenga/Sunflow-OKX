@@ -123,6 +123,8 @@ active_order['active']               = False                                    
 active_order['start']                = 0                                           # Start price when trailing order began     
 active_order['previous']             = 0                                           # Previous price
 active_order['current']              = 0                                           # Current price
+active_order['created']              = 0                                           # Create timestamp in ms
+active_order['updated']              = 0                                           # Update timestamp in ms
 active_order['wiggle']               = config.wave_wiggle                          # Method to use to calculate trigger price distance
 active_order['distance']             = config.wave_distance                        # Trigger price distance percentage when set to default
 active_order['distance_ini']         = config.wave_distance                        # Keep initial distance always stored
@@ -341,7 +343,7 @@ def handle_ticker(message):
                 if (active_order['qty_new'] != active_order['qty']) and (active_order['qty_new'] >= info['minOrderQty']):
 
                     # Amend order quantity
-                    result        = trailing.aqs_helper(active_order, all_sells, all_sells_new, compounding, spot, info)
+                    result        = trailing.adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info)
                     active_order  = result[0]
                     all_sells     = result[1]
                     all_sells_new = result[2]

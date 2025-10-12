@@ -122,15 +122,17 @@ def now_utc():
     # Current UTC datetime
     current_time = datetime.now(timezone.utc)
     milliseconds = math.floor(current_time.microsecond / 10000) / 100
+
+    # Convert current UTC time to the specified local timezone
+    local_tz = pytz.timezone(config.timezone_str)
+    local_time = current_time.astimezone(local_tz)
+
+    # Timestamps
     timestamp_0  = current_time.strftime('%Y-%m-%d %H:%M:%S') + f'.{int(milliseconds * 100):02d}'
     timestamp_1  = current_time.strftime('%Y-%m-%d %H:%M:%S') + f'.{int(milliseconds * 100):02d}' + " | " + config.symbol + ": "
     timestamp_2  = milliseconds
     timestamp_3  = str(milliseconds) + " | "
     timestamp_4  = int(time.time() * 1000)
-
-    # Convert current UTC time to the specified local timezone
-    local_tz = pytz.timezone(config.timezone_str)
-    local_time = current_time.astimezone(local_tz)
     
     # Current local time
     timestamp_5  = local_time.strftime('%Y-%m-%d %H:%M:%S') + f'.{int(milliseconds * 100):02d}'
