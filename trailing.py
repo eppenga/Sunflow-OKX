@@ -57,7 +57,8 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
         do_check_order = True
 
     # Apply forced check
-    if force_check: 
+    if force_check:
+        type_check     = "a forced"
         do_check_order = True
 
     # Current price crossed trigger price or periodic check
@@ -80,7 +81,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
         if error_code == 51603:
             
             # Exchange is lagging
-            defs.announce(f"*** Warning: Exchange did not provide info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
+            defs.log_error(f"*** Warning: Exchange provided no info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
             fill_manual = True
         
         elif error_code !=0 :
@@ -491,7 +492,7 @@ def adjust_qty_order(active_order, info):
     error_code = result[1]
     error_msg  = result[2]
     if error_code != 0:
-        message = f"*** Warning: Something went wrong when trying to amend the quantity! ***"
+        message = f"*** Warning: Failed to adjust the quantity for order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
         return response, error_code, error_msg
 
@@ -590,7 +591,7 @@ def adjust_tp_order(active_order, info):
     error_code = result[1]
     error_msg  = result[2]
     if error_code != 0:
-        message = f"*** Warning: Something went wrong when trying to amend the price! ***"
+        message = f"*** Warning: Failed to adjust the price for order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
         return response, error_code, error_msg
  

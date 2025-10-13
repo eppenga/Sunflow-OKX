@@ -38,15 +38,22 @@ def create_manual_order(active_order, info):
     # Set cumulative quantity and value
     order['cumExecQty']   = order['qty']
     order['cumExecValue'] = order['qty'] * order['avgPrice']
+    order['cumExecValue'] = defs.round_number(order['cumExecValue'], info['quotePrecision'], "down")
     
     # Set cumulative fees
     if active_order['side'] == "Buy":
         order['cumExecFeeCcy'] = info['baseCoin']
         order['cumExecFee']    = order['cumExecQty'] * info['feeTaker']
+        order['cumExecFee']    = defs.round_number(order['cumExecFee'], info['basePrecision'], "down")
         
     elif active_order['side'] == "Sell":
         order['cumExecFeeCcy'] = info['quoteCoin']
         order['cumExecFee']    = order['cumExecValue'] * info['feeTaker']
+        order['cumExecFee']    = defs.round_number(order['cumExecFee'], info['quotePrecision'], "down")
+   
+    # Report to stdout
+    message = f"*** Warning: Created order {active_order['orderid']} manually! ***"
+    defs.log_error(message)
     
     if debug:
         defs.announce(f"Debug: Order {active_order['orderid']} fill data was set manually")
@@ -423,7 +430,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     error_code = result[1]
     error_msg  = result[2]
 
-    # Check if buy error was successsful
+    # Check if buy error was successful
     if error_code !=0:
         
         # Reset active_order
