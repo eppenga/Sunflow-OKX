@@ -444,7 +444,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
         if speed: defs.announce(defs.report_exec(stime))        
         return active_order, all_buys, info
 
-    # Get order ID
+    # Decode order ID
     active_order['orderid'] = int(order['data'][0]['algoId'])
 
     # Get order details from order we just placed

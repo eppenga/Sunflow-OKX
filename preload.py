@@ -26,7 +26,7 @@ def get_ticker():
     ticker     = {'time': 0, 'symbol': config.symbol, 'lastPrice': 0}
 
     # Load ticker
-    result   = exchange.get_ticker()
+    result     = exchange.get_ticker()
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
@@ -37,7 +37,7 @@ def get_ticker():
         defs.log_error(message)
         return ticker
 
-    # Transform ticker into required format
+    # Decode ticker into required format
     ticker['time']      =   int(response['data'][0]['ts'])
     ticker['symbol']    =       response['data'][0]['instId']
     ticker['lastPrice'] = float(response['data'][0]['last'])
@@ -79,7 +79,7 @@ def get_klines(interval, limit):
         defs.log_error(message)
         return klines   
       
-    # Transform klines into required format
+    # Decode klines into required format
     for row in response['data']:
         klines['time'].append(int(row[0]))            # Time (timestamp in ms)
         klines['open'].append(float(row[1]))          # Open price
@@ -226,7 +226,7 @@ def get_info(spot, multiplier, compounding):
         defs.log_error(message)
         return info  
    
-    # Transform instrument info and fee rates into required format
+    # Decode instrument info and fee rates into required format
     info['time']           = defs.now_utc()[4]                # Time of last instrument update
     info['symbol']         = instrument['instId']             # Symbol
     info['baseCoin']       = instrument['baseCcy']            # Base asset, in case of BTCUSDT it is BTC 

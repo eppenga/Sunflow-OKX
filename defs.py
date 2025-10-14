@@ -5,7 +5,7 @@
 # Load external libraries
 from pathlib import Path
 from datetime import datetime, timezone
-import inspect, math, pprint, pytz, time
+import apprise, inspect, math, pprint, pytz, time
 
 # Load internal libraries
 from loader import load_config
@@ -13,6 +13,10 @@ import defs, indicators, preload
 
 # Load config
 config = load_config()
+
+# Create an Apprise instance
+apobj = apprise.Apprise()
+apobj.add(config.notify_url)
 
 # Initialize variables 
 df_errors    = 0        # Dataframe error counter
@@ -628,13 +632,14 @@ def calc_compounding(info, spot, compounding):
     return info
 
 # Send out a notification via stdout
-def announce(message):
+def announce(message, external=False):
    
     # Initialize variables
     stack        = inspect.stack()
     call_frame   = stack[1]
     filename     = Path(call_frame.filename).name
     functionname = call_frame.function
+    announcement = ""
     
     # Local or UTC time
     if config.timeutc_std:
@@ -643,25 +648,33 @@ def announce(message):
         timestamp = now_utc()[6]
 
     # Safeguard from type errors
-    message = str(message)
+    announcement = str(message)
 
     # Check if we can notify for blanc messages
-    if not message:
+    if not announcement:
         message_none = timestamp + f"{filename}: {functionname}: No announcement available"
         return message_none
 
     # Message for stdout
-    message_stdout = timestamp + f"{filename}: {functionname}: {message}"    
+    announcement = timestamp + f"{filename}: {functionname}: {announcement}"    
 
     # Check if we can notify for session messages
-    if not config.session_report and "session:" in message:
-        return message_stdout
+    if not config.session_report and "session:" in announcement:
+        return announcement
          
-    # Report to stdout
-    print(message_stdout + "\n")
+    # Report to stdout for normal messages
+    if not external:
+        print(announcement + "\n")
     
+    # Report via Apprise for other messages
+    if external and config.notify_enabled:
+        apobj.notify(
+            body  = str(message),
+            title = "Sunflow@OKX"
+        )
+ 
     # Return message
-    return message_stdout
+    return announcement
 
 # Round value to the nearest step size
 def round_number(value, step_size, rounding = ""):

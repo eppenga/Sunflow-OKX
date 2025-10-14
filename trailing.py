@@ -107,13 +107,18 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
             closed_order = result[3]
             revenue      = result[4]
         
-            # Fill in average price and report message
+            # Fill in average price and report message, first via stdout
             if active_order['side'] == "Buy":
                 message += f" and fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
             elif active_order['side'] == "Sell":
                 message += f", fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']} "
                 message += f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
             defs.announce(message)
+           
+           # Then via Apprise to other platforms
+            message = f"sold {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']}, "
+            message = message + f"profit is {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
+            defs.announce(message, True)
            
             # Report balances and adjust compounding
             compounding['now'] = orders.report_balances(spot, all_buys, info)[0]
