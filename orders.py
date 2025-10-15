@@ -7,7 +7,7 @@ from loader import load_config
 import pprint, requests
 
 # Load internal libraries
-import database, defs, exchange, distance, preload
+import database, decode, defs, exchange, distance, preload
 
 # Load config
 config = load_config()
@@ -52,8 +52,8 @@ def create_manual_order(active_order, info):
         order['cumExecFee']    = defs.round_number(order['cumExecFee'], info['quotePrecision'], "down")
    
     # Report to stdout
-    message = f"*** Warning: Created order {active_order['orderid']} manually! ***"
-    defs.log_error(message)
+    message = f"*** Warning: Created order {active_order['orderid']} based on active order! ***"
+    defs.announce(message)
     
     if debug:
         defs.announce(f"Debug: Order {active_order['orderid']} fill data was set manually")
@@ -87,9 +87,9 @@ def get_order(orderid, skip=False):
     error_code = result[1]
     error_msg  = result[2]
     
-    # Decode response to order
+    # Decode order
     if error_code == 0:
-        order = decode_order(response)
+        order = decode.order(response)
     
     # Debug to stdout
     if debug:
@@ -127,9 +127,9 @@ def get_linked_order(linkedid):
     error_code = result[1]
     error_msg  = result[2]
     
-    # Decode response to order
+    # Decode linked order to get fills
     if error_code == 0:
-        fills = decode_linked_order(response)
+        fills = decode.linked_order(response)
   
     # Debug to stdout
     if debug:
@@ -174,81 +174,6 @@ def cancel_order(orderid):
 
     # Return error code
     return response, error_code, error_msg
-
-# Decode order from exchange
-def decode_order(response):
-    
-    # Debug
-    debug = False
-    
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: Before decode:")
-        pprint.pprint(response)
-        print()
-
-    # Initialize variables
-    order  = {}
-    result = response['data'][0]
-
-    # Map order to response
-    order['createdTime']   = int(result['cTime'])                           # Creation timestamp in ms
-    order['updatedTime']   = int(result['uTime'])                           # Last update timestamp in ms
-    order['orderid']       = result['algoId']                               # Order ID by exchange
-    order['linkedid']      = result['ordId']                                # Linked SL order ID
-    order['symbol']        = result['instId']                               # Symbol
-    order['side']          = result['side'].capitalize()                    # Buy or Sell
-    order['orderType']     = result['ordType'].capitalize()                 # Order type: Market, Limit, etc...
-    order['orderStatus']   = result['state'].capitalize()                   # Order state: Live, Pause, Partially_effective, Effective, Canceled, Order_failed, Partially_failed
-    order['qty']           = float(result.get('sz'))                        # Quantity in base (BTC)
-    order['triggerPrice']  = float(result.get('slTriggerPx'))               # Trigger price in quote (USDT)
-    order['avgPrice']      = 0                                              # Average fill price in quote (USDT)
-    order['cumExecQty']    = 0                                              # Cumulative executed quantity in base (BTC)
-    order['cumExecValue']  = 0                                              # Cumulative executed value in quote (USDT)
-    order['cumExecFee']    = 0                                              # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
-    order['cumExecFeeCcy'] = ''                                             # Cumulative executed fee currency 
-
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: After decode:")
-        pprint.pprint(order)
-        print()
-
-    # Return order
-    return order
-
-# Decode linked order from exchange to get the fills
-def decode_linked_order(response):
-    
-    # Debug
-    debug = False
-    
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: Before decode:")
-        pprint.pprint(response)
-        print()
-
-    # Initialize variables
-    fills  = {}
-    result = response['data'][0]
-
-    # Map fills to response
-    fills['orderStatus']   = result['state'].capitalize()                   # Order state: Canceled, Live, Partially_filled, Filled and Mmp_canceled
-    fills['avgPrice']      = float(result['avgPx'])                         # Average fill price in quote (USDT)
-    fills['cumExecQty']    = float(result['accFillSz'])                     # Cumulative executed quantity in base (BTC)
-    fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']        # Cumulative executed value in quote (USDT)
-    fills['cumExecFee']    = float(result['fee']) * -1                      # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
-    fills['cumExecFeeCcy'] = result['feeCcy']                               # Cumulative executed fee currency (quote or base, USDT or BTC)
-   
-    # Debug to stdout
-    if debug:
-        defs.announce("Debug: After decode:")
-        pprint.pprint(fills)
-        print()
-
-    # Return fills
-    return fills
 
 # Merge order and fills
 def merge_order_fills(order, fills, info):
@@ -398,6 +323,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     stime = defs.now_utc()[4]
     
     # Initialize variables
+    response   = {}
     order      = {}
     result     = ()
     error_code = 0
@@ -426,7 +352,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
 
     # Place buy order
     result     = exchange.place_order(active_order)
-    order      = result[0]
+    response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
 
@@ -445,7 +371,7 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
         return active_order, all_buys, info
 
     # Decode order ID
-    active_order['orderid'] = int(order['data'][0]['algoId'])
+    active_order['orderid'] = decode.orderid(response)
 
     # Get order details from order we just placed
     result     = get_order(active_order['orderid'])
@@ -613,20 +539,13 @@ def get_balance(currency):
     if error_code != 0:
         message = f"*** Error: Failed to get balance for {currency}! ***"
         defs.log_error(message)
-        return balance, error_code, error_msg
        
-    # Decode response to balance
-    try:
-        details = response.get("data", [])[0].get("details", [])
-        if details and "eq" in details[0]:
-            balance = float(details[0].get("eq") or 0)
-    except (IndexError, ValueError, TypeError):
-        pass
+    # Decode balance
+    balance = decode.balance(response)
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Balance information:")
-        pprint.pprint(balance)
+        defs.announce(f"Debug: Balance information: {balance}")
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))

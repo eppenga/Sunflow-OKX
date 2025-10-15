@@ -21,7 +21,7 @@ def calculate(klines, spot):
     # Calculate start and end times
     if debug:
         start_time = defs.now_utc()[4]
-        defs.announce("Calculating indicators")
+        defs.announce("Debug: Calculating indicators")
         
     # Indicators: Calculate various Oscillators
     df['RSI']         = ta.rsi(df['close'], length=14)
@@ -76,6 +76,7 @@ def calculate(klines, spot):
 
     # Debug to stdout
     if debug:
+        defs.announce("Debug: Calculated indicators")
         print("Combined Dataframes")
         print(df)
         print("MACD Dataframes")
@@ -194,7 +195,7 @@ def calculate(klines, spot):
 
     # Debug to stdout
     if debug:
-        defs.announce("Advice calculated:")
+        defs.announce("Debug: Advice calculated:")
         print(indicators)
         end_time = defs.now_utc()[4]
         defs.announce(f"Pandas_ta spent {end_time - start_time}ms calculating indicators and advice")
@@ -320,7 +321,7 @@ def advice(indicators):
 
     # Debug to stdout
     if debug:
-        defs.announce("Technical Indicator Advice")
+        defs.announce("Debug: Technical Indicator Advice")
         print("Moving Averages BUY      : " + str(countAB))
         print("Moving Averages NEUTRAL  : " + str(countAN))
         print("Moving Averages SELL     : " + str(countAS))

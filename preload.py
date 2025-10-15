@@ -4,10 +4,10 @@
 
 # Load external libraries
 from loader import load_config
-import os, requests, pprint
+import os, pprint
 
 # Load internal libraries
-import database, defs, exchange, orders
+import database, decode, defs, exchange, orders
 
 # Load config
 config = load_config()
@@ -19,29 +19,24 @@ def get_ticker():
     debug = False
     
     # Initialize variables
+    ticker     = {}
     response   = {}
     result     = ()
     error_code = 0
     error_msg  = ""
-    ticker     = {'time': 0, 'symbol': config.symbol, 'lastPrice': 0}
 
     # Load ticker
     result     = exchange.get_ticker()
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
-    # Check for errors
     if error_code !=0:
         message = f"*** Error: Failed to get ticker ***\n>>> Message {error_code} - {error_msg}"
         defs.log_error(message)
-        return ticker
 
-    # Decode ticker into required format
-    ticker['time']      =   int(response['data'][0]['ts'])
-    ticker['symbol']    =       response['data'][0]['instId']
-    ticker['lastPrice'] = float(response['data'][0]['last'])
-     
+    # Decode ticker
+    ticker = decode.ticker(response)
+    
     # Report to stdout
     defs.announce(f"Initial ticker price set to {ticker['lastPrice']} {ticker['symbol']} via exchange")
 
@@ -61,34 +56,23 @@ def get_klines(interval, limit):
     debug = False
     
     # Initialize variables
+    klines     = {}
     response   = {}
     result     = ()
     error_code = 0
     error_msg  = ""   
-    klines     = {'time': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': [], 'turnover': [], 'status': []}
 
     # Load klines
     result     = exchange.get_klines(interval, limit)
     response   = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
-    # Check for errors
     if error_code !=0:
         message = f"*** Error: Failed to get klines ***\n>>> Message {error_code} - {error_msg}"
         defs.log_error(message)
-        return klines   
       
-    # Decode klines into required format
-    for row in response['data']:
-        klines['time'].append(int(row[0]))            # Time (timestamp in ms)
-        klines['open'].append(float(row[1]))          # Open price
-        klines['high'].append(float(row[2]))          # High price
-        klines['low'].append(float(row[3]))           # Low price
-        klines['close'].append(float(row[4]))         # Close price
-        klines['volume'].append(float(row[5]))        # Volume (base quantity)
-        klines['turnover'].append(float(row[7]))      # Turnover (base * quote quantity)
-        klines['status'].append(int(row[8]))          # Kline state (0 is incomplete, 1 is complete)
+    # Decode klines
+    klines = decode.klines(response)
     
     # Check response from exchange
     amount_klines = len(klines['time'])
@@ -204,40 +188,25 @@ def get_info(spot, multiplier, compounding):
 
     # Load instrument info
     result     = exchange.get_instruments()
-    instrument = result[0]['data'][0]
+    instrument = result[0]
     error_code = result[1]
     error_msg  = result[2]
-    
-    # Check for errors
     if error_code !=0:
         message = f"*** Error: Failed to get info ***\n>>> Message {error_code} - {error_msg}"
         defs.log_error(message)
-        return info
 
     # Load fee rates
     result     = exchange.get_fees()
-    rates      = result[0]['data'][0]
+    rates      = result[0]
     error_code = result[1]
     error_msg  = result[2]
-
-    # Check for errors
     if error_code !=0:
         message = f"*** Error: Failed to get fee rates ***\n>>> Message {error_code} - {error_msg}"
         defs.log_error(message)
-        return info  
    
-    # Decode instrument info and fee rates into required format
-    info['time']           = defs.now_utc()[4]                # Time of last instrument update
-    info['symbol']         = instrument['instId']             # Symbol
-    info['baseCoin']       = instrument['baseCcy']            # Base asset, in case of BTCUSDT it is BTC 
-    info['quoteCoin']      = instrument['quoteCcy']           # Quote asset, in case of BTCUSDT it is USDT
-    info['status']         = instrument['state']              # Is the symbol actively trading?
-    info['basePrecision']  = float(instrument['lotSz'])       # Decimal precision of base asset (BTC)
-    info['quotePrecision'] = float(instrument['tickSz'])      # Decimal precision of quote asset (USDT)
-    info['minOrderQty']    = float(instrument['minSz'])       # Minimum order quantity in base asset (BTC)
-    info['tickSize']       = float(instrument['tickSz'])      # Smallest possible price increment of base asset (USDT)
-    info['feeMaker']       = abs(float(rates['maker']))       # Maker fee
-    info['feeTaker']       = abs(float(rates['taker']))       # Taker fee
+    # Decode instrument info and fee rates
+    info = decode.info(instrument)
+    info = decode.fees(info, rates)
 
     # Calculate info['buyBase'] and info['buyQuote']
     info = calc_info(info, spot, multiplier, compounding)

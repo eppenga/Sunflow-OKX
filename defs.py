@@ -178,7 +178,7 @@ def log_error(exception):
     
     # Debug to stdout
     if debug:
-        defs.announce("Debug:")
+        defs.announce("Debug: Error logging")
         print("Exception RAW:")
         print(exception)
         print()

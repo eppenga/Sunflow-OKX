@@ -1,6 +1,6 @@
 ### Sunflow Cryptobot ###
 #
-# Market data from exchange
+# Get data from exchange
 
 # Load external libraries
 from loader import load_config
@@ -38,7 +38,9 @@ def check_response(response, silent=False):
     error_msg   = ""
     
     if debug:
-        defs.announce(f"Raw response: {response}")
+        defs.announce(f"Debug: Raw response:")
+        pprint.pprint(response)
+        print()
 
     # Get code and message of request
     try:
@@ -69,7 +71,7 @@ def check_response(response, silent=False):
     
     # Debug to stdout
     if debug:
-        defs.announce("Response codes and messages:")
+        defs.announce("Debug: Response codes and messages:")
         print(f"code: {code}", f"\nmsg: {msg}", f"\nsCode: {sCode}", f"\nsMsg: {sMsg}", f"\nerror_code: {error_code}", f"\nerror_msg: {error_msg}\n")
 
     # Return
@@ -354,7 +356,7 @@ def place_order(active_order):
     rate_limit = False    
 
     if debug:
-        defs.announce(f"Trying to place {active_order['side']} algo order")
+        defs.announce(f"Debug: Trying to place {active_order['side']} algo order")
         print(f"instId      = {config.symbol}")
         print(f"tdMode      = cash")
         print(f"side        = {active_order['side'].lower()}")
@@ -384,7 +386,7 @@ def place_order(active_order):
             response = tradeAPI.place_algo_order(**kwargs)
             
         except Exception as e:
-            message    = f"*** Error: Failed to place {active_order['side']} order ***\n>>> Message: {e}"
+            message = f"*** Error: Failed to place {active_order['side']} order ***\n>>> Message: {e}"
             defs.log_error(message)
 
         # Log response
@@ -425,7 +427,7 @@ def get_order(orderid, skip=False):
     recheck    = False
 
     # Get reponse
-    if debug: defs.announce(f"Trying to get details for order {orderid}")	
+    if debug: defs.announce(f"Debug: Trying to get details for order {orderid}")	
     for attempt in range(10):
         
         # Set checks
@@ -468,7 +470,7 @@ def get_order(orderid, skip=False):
 
 	# Announce success
     if not rate_limit and not recheck:
-        if debug: defs.announce(f"Received details for order {orderid}")
+        if debug: defs.announce(f"Debug: Received details for order {orderid}")
     else:
         message = f"*** Warning: Failed to receive details for order {orderid} ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
@@ -496,7 +498,7 @@ def get_linked_order(linkedid):
     recheck    = False
 
     # Get reponse
-    if debug: defs.announce(f"Trying to get all fills on linked order {linkedid}")	
+    if debug: defs.announce(f"Debug: Trying to get all fills on linked order {linkedid}")	
     for attempt in range(10):
         
         # Set checks
@@ -537,7 +539,7 @@ def get_linked_order(linkedid):
 
 	# Announce success
     if not rate_limit and not recheck:
-        if debug: defs.announce(f"Received all fills for linked order {linkedid}")
+        if debug: defs.announce(f"Debug: Received all fills for linked order {linkedid}")
     else:
         message = f"*** Warning: Failed to receive details fills for linked order {linkedid} ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
@@ -620,9 +622,8 @@ def amend_order(orderid, new_price=0, new_qty=0):
 
     # Check pre-conditions
     if new_price !=0 and new_qty !=0:
-        message = "*** Error: New price and new quantity can't have both values, one must be zero. ***"
+        message = "*** Error: New price and new quantity can't have both values, one must be zero ***"
         defs.log_error(message)
-        return response, error_code, error_msg
     
     # Get reponse
     for attempt in range(3):

@@ -3,7 +3,7 @@
 # Traling buy and sell
 
 # Load external libraries
-import pprint, requests, threading
+import pprint
 
 # Load internal libraries
 from loader import load_config
@@ -81,17 +81,19 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
         if error_code == 51603:
             
             # Exchange is lagging
-            defs.log_error(f"*** Warning: Exchange provided no info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
+            defs.announce(f"*** Warning: Exchange provided no info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
             fill_manual = True
         
         elif error_code !=0 :
             
             # Any other error
-            message = f"*** Error: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
+            message = f"*** Warning: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
             
 
-        # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process
+        #########################################################################################################
+        # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process #
+        #########################################################################################################
         if fill_manual or order['orderStatus'] == "Effective":
             
             # Prepare message for stdout
@@ -107,7 +109,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
             closed_order = result[3]
             revenue      = result[4]
         
-            # Fill in average price and report message, first via stdout
+            # Report filled order first via stdout and...
             if active_order['side'] == "Buy":
                 message += f" and fill price {defs.format_number(closed_order['avgPrice'], info['tickSize'])} {info['quoteCoin']}"
             elif active_order['side'] == "Sell":
@@ -115,12 +117,13 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
                 message += f"and profit {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
             defs.announce(message)
            
-           # Then via Apprise to other platforms
-            message = f"sold {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']}, "
-            message = message + f"profit is {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
-            defs.announce(message, True)
+           # ...then via Apprise to another platform
+            if active_order['side'] == "Sell":
+                message  = f"sold {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']}, "
+                message += f"profit is {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
+                defs.announce(message, True)
            
-            # Report balances and adjust compounding
+            # Report balances to stdout and adjust compounding
             compounding['now'] = orders.report_balances(spot, all_buys, info)[0]
                             
             # Report compounding, only possible when balance reporting is active, see config file
@@ -173,10 +176,9 @@ def check_spike(active_order, order, all_buys, spot, info):
         all_buys     = result[1]
         error_code   = result[2]
         error_msg    = result[3]           
-    
-    if error_code != 0:
-        message = f"*** Warning: Failed to remove spiked order '{active_order['orderid']}' ! ***\n>>> Message: {error_code} - {error_msg}"
-        defs.log_error(message)
+        if error_code != 0:
+            message = f"*** Warning: Failed to remove spiked order '{active_order['orderid']}' ! ***\n>>> Message: {error_code} - {error_msg}"
+            defs.log_error(message)
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
@@ -197,9 +199,6 @@ def calculate_revenue(order, all_sells, spot, info):
     buys          = 0
     revenue       = 0
     fees          = {}
-    fees['buy']   = 0
-    fees['sell']  = 0
-    fees['total'] = 0
     
     # Calculate
     sells         = order['cumExecValue']
@@ -283,8 +282,9 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
     stime = defs.now_utc()[4]
     
     # Initialize variables
-    revenue = 0
-    order   = {}
+    revenue   = 0
+    order     = {}
+    do_manual = False
     
     # Make active_order inactive and preset linkedid
     active_order['active']   = False
@@ -303,16 +303,16 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
         error_code = result[1]
         error_msg  = result[2]
         if error_code != 0:
-            message = f"*** Error: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            do_manual = True
+            message = f"*** Warning: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
-            return active_order, all_buys, all_sells, order, revenue
 
         # Add linked order to active_order
         active_order['linkedid'] = order['linkedid']
     
         # Debug to stdout
         if debug:
-            defs.announce(f"Active order data:")
+            defs.announce(f"Debug: Active order data:")
             pprint.pprint(active_order)
             print()
 
@@ -322,16 +322,25 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
         error_code = result[1]
         error_msg  = result[2]
         if error_code != 0:
-            message = f"*** Error: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            message = f"*** Warning: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            do_manual = True
             defs.log_error(message)
             return active_order, all_buys, all_sells, order, revenue
 
-        # Glue order and fills together
-        order = orders.merge_order_fills(order, fills, info)
-        defs.announce(f"Merged order {active_order['orderid']} with linked TP/SL order {active_order['linkedid']}")
+        # Glue orders or get it manually
+        if not do_manual:
 
-        # Set Sunflow order status to Closed
-        order['status'] = "Closed"
+            # Glue order and fills together
+            order = orders.merge_order_fills(order, fills, info)
+            defs.announce(f"Merged order {active_order['orderid']} with linked TP/SL order {active_order['linkedid']}")
+
+            # Set Sunflow order status to Closed
+            order['status'] = "Closed"
+        
+        else:
+            
+            # Get the order manually if exchange failed
+            order = orders.create_manual_order(active_order, info)
           
     # Register in database and calculate revenue
     result    = close_trail_register(order, all_buys, all_sells, spot, info)
@@ -431,7 +440,9 @@ def adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info):
     error_code  = result[1]
     error_msg   = result[2]
 
-    # Determine what to do based on error code of amend result
+    #########################
+    # Check exchange errors #
+    #########################
     if error_code == 0:
 
         # Everything went fine, we can continue trailing
@@ -530,7 +541,9 @@ def adjust_tp(active_order, all_buys, all_sells, compounding, spot, info):
     error_code = result[1]
     error_msg  = result[2]
 
-    # Determine what to do based on error code of amend result
+    #########################
+    # Check exchange errors #
+    #########################
     if error_code == 0:
 
         # Everything went fine, we can continue trailing

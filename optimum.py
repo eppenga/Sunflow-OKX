@@ -210,14 +210,15 @@ def optimize(prices, profit, active_order, use_spread, optimizer):
     global df_errors, halt_sunflow
   
     # Initialize variables
-    interval     = str(optimizer['interval']) + optimizer['delta']   # Interval used for indicator KPI (in our case historical volatility)
-    distance     = optimizer['distance']    # Initial distance
-    distance_new = optimizer['distance']    # New distance to be
-    spread       = optimizer['spread']      # Initial spread
-    spread_new   = optimizer['spread']      # New spread to be
-    profit       = optimizer['profit']      # Initial profit
-    profit_new   = optimizer['profit']      # New profit to be
-    success      = False                    # Optimize possible
+    limit        = str(int(''.join(filter(str.isdigit, optimizer['interval']))))
+    interval     = limit + optimizer['delta']   # Interval used for indicator KPI (in our case historical volatility)
+    distance     = optimizer['distance']        # Initial distance
+    distance_new = optimizer['distance']        # New distance to be
+    spread       = optimizer['spread']          # Initial spread
+    spread_new   = optimizer['spread']          # New spread to be
+    profit       = optimizer['profit']          # Initial profit
+    profit_new   = optimizer['profit']          # New profit to be
+    success      = False                        # Optimize possible
 
     # Optimize only on desired sides
     if active_order['side'] not in optimizer['sides']:

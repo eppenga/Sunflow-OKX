@@ -40,7 +40,6 @@ ticker                               = {}                                       
 profit                               = config.profit                               # Minimum profit percentage
 multiplier                           = config.multiplier                           # Multiply minimum order quantity by this
 prices                               = {}                                          # Last prices based on ticker data
-limit                                = 250                                         # Number of prices in prices array
 timestamp                            = defs.now_utc()[4]                           # Get the current time
 
 # Minimum spread between historical buy orders
@@ -228,7 +227,7 @@ def handle_ticker(message):
         current_time        = defs.now_utc()[4]
         lock_ticker['time'] = current_time
         
-        # Decoded message and get latest ticker
+        # Decode message and get the latest ticker
         ticker['time']          = int(message['data'][0]['ts'])
         ticker['lastPrice']     = float(message['data'][0]['last'])
         active_order['current'] = ticker['lastPrice']
@@ -396,7 +395,7 @@ def handle_kline(message, interval_index):
             pprint.pprint(message)
             print()
 
-        # Decode message and get latest kline
+        # Decode message and get the latest kline
         row = message['data'][0]
         kline['time']     =   int(row[0])
         kline['open']     = float(row[1])
@@ -468,7 +467,7 @@ def handle_orderbook(message):
         # Recalculate depth to numerical value
         depthN = ((2 * depth) / 100.0) * spot
 
-        # Extracting data array
+        # Decode message and get the latest orderbook
         data_items = message.get('data', [])
         if not data_items:
             return
@@ -616,7 +615,7 @@ def handle_trade(message):
             defs.announce("Debug: *** Incoming trade ***")
             print(f"{message}\n")
 
-        # Combine the trades
+        # Decode message and get the latest trades
         for t in message.get('data', []):
             trades['time'].append(int(t['ts']))                 # ts: exchange ms timestamp
             trades['side'].append(t['side'].capitalize())       # "buy"/"sell" -> "Buy"/"Sell"
@@ -760,7 +759,7 @@ if use_indicators['enabled']:
 if use_spread['enabled']:
     print(f"Spread    : {use_spread['distance']} %")
 print(f"Profit    : {profit} %")
-print(f"Tickers   : {limit} prices")
+print(f"Prices    : {config.prices_limit}")
 print(f"Timestamp : {timestamp} ms\n")
 
 
@@ -780,13 +779,13 @@ spot                 = ticker['lastPrice']
 info                 = preload.get_info(spot, multiplier, compounding)
 all_buys             = database.load(config.dbase_file, info)
 all_buys             = preload.check_orders(all_buys, info)
-prices               = preload.get_prices('1m', 250)
+prices               = preload.get_prices(config.prices_interval, config.prices_limit)
 
 # Preload optimizer and load prices
 if optimizer['enabled']:
 
     # Get historical prices and combine with current prices
-    prices_old   = preload.get_prices(optimizer['interval'], 1000)
+    prices_old   = preload.get_prices(optimizer['interval'], optimizer['prices'])
     prices       = preload.combine_prices(prices_old, prices)
     
     # Calulcate optimized data

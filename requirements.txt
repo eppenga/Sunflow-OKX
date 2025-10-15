@@ -3,3 +3,4 @@ pytz
 pandas
 pandas-ta
 websockets
+apprise

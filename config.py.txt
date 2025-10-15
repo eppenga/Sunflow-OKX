@@ -16,6 +16,10 @@ wave_distance           = 0.080        # Trigger price distance percentage when 
 wave_timeframe          = 5000         # Timeframe in ms to measure wave length, used when wiggle uses Wave, EMA or Hybrid
 wave_multiplier         = 1.00         # Multiply wave percentage by this multiplier
 
+# Prices
+prices_limit            = 250          # Number of prices in memory for various calculations
+prices_interval         = '1m'         # Timeframe interval of the prices
+
 # Spread indicators
 spread_enabled          = True         # Use spread as buy indicator
 spread_distance         = 0.050        # Minimum spread in percentages
@@ -79,7 +83,8 @@ optimizer_enabled       = False        # Try to optimize the minimum profit and 
 optimizer_spread        = False        # If optimize is active, also optimize spread distance
 optimizer_sides         = "Buy,Sell"   # When optimizing optimize both on buy and sell or only sell
 optimizer_method        = "Volatility" # Method used to optimize distance, profit and / or spread
-optimizer_interval      = 30           # Interval in minutes used for indicator KPI
+optimizer_prices        = 250          # Number prices to download
+optimizer_interval      = '30m'        # Interval in minutes used for indicator KPI
 optimizer_delta         = "min"        # Delta  used for indicator KPI (s, min or h)
 optimizer_limit_min     = 25920000     # Minimum miliseconds of spot price data (8,640,000 is one day)
 optimizer_limit_max     = 864000000    # Maximum miliseconds of spot price data
