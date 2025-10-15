@@ -16,7 +16,7 @@ config = load_config()
 def create_manual_order(active_order, info):
 
     # Debug
-    debug = True
+    debug = False
     
     # Initialize variables
     order = {}
