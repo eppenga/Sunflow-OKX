@@ -252,6 +252,27 @@ def check_files():
     
     defs.announce("All folders and files checked")
     
+# Check if an order is valid when filled
+def filled_valid(order):
+    
+    # Debug
+    debug = False
+
+    # Initialize variables
+    valid = True
+    
+    # Checks
+    if order['orderStatus'] != "Effective": valid = False
+    if order['avgPrice'] == 0             : valid = False
+    if order['cumExecFee'] == 0           : valid = False
+    if order['cumExecFeeCcy'] == ""       : valid = False
+    if order['cumExecQty'] == 0           : valid = False
+    if order['linkedid'] == ""            : valid = False
+
+    # Return status
+    return valid
+    
+
 # Check orders in database if they still exist
 def check_orders(all_buys, info):
     
@@ -314,10 +335,13 @@ def check_orders(all_buys, info):
                 defs.log_error(message)
 
         # Assign status, if not filled (effective at OKX) just disregard
-        if temp_order['orderStatus'] == "Effective":
+        if filled_valid(temp_order):
             temp_order['status'] = "Closed"
             all_buys_new.append(temp_order)
-        
+        else:
+            message = f"*** Warning: Order {temp_order['orderid']} not valid, removed from database ***"
+            defs.announce(message)
+    
     # Save refreshed database
     database.save(all_buys_new, info)
     
