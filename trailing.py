@@ -325,7 +325,6 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
             message = f"*** Warning: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
             do_manual = True
             defs.log_error(message)
-            return active_order, all_buys, all_sells, order, revenue
 
         # Glue orders or get it manually
         if not do_manual:

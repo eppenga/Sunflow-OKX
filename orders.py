@@ -183,10 +183,14 @@ def merge_order_fills(order, fills, info):
     
     # Merge fills into order
     order['avgPrice']      = fills['avgPrice']
-    order['cumExecQty']    = defs.round_number(fills['cumExecQty'], info['basePrecision'], "down")
-    order['cumExecValue']  = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")   
+    order['cumExecQty']    = fills['cumExecQty']
+    order['cumExecValue']  = fills['cumExecValue']
     order['cumExecFee']    = fills['cumExecFee']
     order['cumExecFeeCcy'] = fills['cumExecFeeCcy']
+    
+    # Round numbers
+    order['cumExecQty']   = defs.round_number(fills['cumExecQty'], info['basePrecision'], "down")
+    order['cumExecValue'] = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")
     
     # Debug to stdout
     if debug:

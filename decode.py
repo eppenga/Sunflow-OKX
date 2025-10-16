@@ -231,7 +231,7 @@ def linked_order(response):
     fills['cumExecValue']  = fills['avgPrice'] * fills['cumExecQty']      # Cumulative executed value in quote (USDT)
     fills['cumExecFee']    = float(data['fee']) * -1                      # Cumulative executed fee in base for buy (BTC) and quote for sell (USDT)
     fills['cumExecFeeCcy'] = data['feeCcy']                               # Cumulative executed fee currency (quote or base, USDT or BTC)
-    
+        
     # Debug
     if debug:
         defs.announce(f"Debug: Afer decode fills from linked order:")
