@@ -12,8 +12,8 @@ import database, decode, defs, exchange, distance, preload
 # Load config
 config = load_config()
 
-# Create fake manual order in case exchange is not providing
-def create_manual_order(active_order, info):
+# Create virtual order in case exchange is not providing
+def virtual_order(active_order, info):
 
     # Debug
     debug = False
@@ -52,7 +52,7 @@ def create_manual_order(active_order, info):
         order['cumExecFee']    = defs.round_number(order['cumExecFee'], info['quotePrecision'], "down")
    
     # Report to stdout
-    message = f"*** Warning: Created order {active_order['orderid']} based on active order! ***"
+    message = f"*** Warning: Created virtual order {active_order['orderid']} ! ***"
     defs.announce(message)
     
     if debug:
@@ -63,7 +63,7 @@ def create_manual_order(active_order, info):
         pprint.pprint(order)
         print()
         
-    # Return manually created order
+    # Return virtual created order
     return order
 
 # Get order details

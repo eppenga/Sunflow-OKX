@@ -32,7 +32,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
     # Initialize variables
     result         = ()
     type_check     = ""
-    fill_manual    = False
+    virtual    = False
     do_check_order = False
     error_code     = 0
     error_msg      = ""
@@ -82,7 +82,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
             
             # Exchange is lagging
             defs.announce(f"*** Warning: Exchange provided no info on order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}")
-            fill_manual = True
+            virtual = True
         
         elif error_code !=0 :
             
@@ -94,7 +94,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
         #########################################################################################################
         # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process #
         #########################################################################################################
-        if fill_manual or order['orderStatus'] == "Effective":
+        if virtual or order['orderStatus'] == "Effective":
             
             # Prepare message for stdout
             defs.announce(f"*** Trailing {active_order['side'].lower()} order has been filled! ***")
@@ -102,7 +102,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
             message += f"at trigger price {defs.format_number(active_order['trigger'], info['tickSize'])} {info['quoteCoin']}"
             
             # Close trailing process
-            result       = close_trail(active_order, all_buys, all_sells, spot, info, fill_manual)
+            result       = close_trail(active_order, all_buys, all_sells, spot, info, virtual)
             active_order = result[0]
             all_buys     = result[1]
             all_sells    = result[2]
@@ -274,7 +274,7 @@ def close_trail_register(order, all_buys, all_sells, spot, info):
     return all_buys, all_sells, revenue
     
 # Trailing order does not exist anymore, close it
-def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False):
+def close_trail(active_order, all_buys, all_sells, spot, info, virtual=False):
 
     # Debug and speed
     debug = False
@@ -291,11 +291,11 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
     active_order['linkedid'] = "-1"
     
     # Create order manually if exchange failed
-    if fill_manual:
-        order = orders.create_manual_order(active_order, info)
-
+    if virtual:
+        order = orders.virtual_order(active_order, info)
+        
     # Query exchange on real orders
-    if not fill_manual:
+    if not virtual:
     
         # Get buy or sell order
         result     = orders.get_order(active_order['orderid']) 
@@ -304,7 +304,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
         error_msg  = result[2]
         if error_code != 0:
             do_manual = True
-            message = f"*** Warning: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            message   = f"*** Warning: Failed to get order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
 
         # Add linked order to active_order
@@ -322,7 +322,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
         error_code = result[1]
         error_msg  = result[2]
         if error_code != 0:
-            message = f"*** Warning: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
+            message   = f"*** Warning: Failed to get fills from linked order when trying to close trail! ***\n>>> Message: {error_code} - {error_msg}"
             do_manual = True
             defs.log_error(message)
 
@@ -339,7 +339,7 @@ def close_trail(active_order, all_buys, all_sells, spot, info, fill_manual=False
         else:
             
             # Get the order manually if exchange failed
-            order = orders.create_manual_order(active_order, info)
+            order = orders.virtual_order(active_order, info)
           
     # Register in database and calculate revenue
     result    = close_trail_register(order, all_buys, all_sells, spot, info)

@@ -882,7 +882,7 @@ def report_exec(start_time, supplement = "", always_display = False):
         if supplement:
             message = message + f" ({supplement})"
         if exec_time > warn_delay:
-            message = "*** Warning " + message + "! ***"
+            message = "*** Warning: " + message + "! ***"
         
     # Return message
     return message
