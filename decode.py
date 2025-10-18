@@ -248,7 +248,7 @@ def balance(response):
     debug = False
     
     # Initialize variables
-    balance = 0
+    balances = {}
 
     # Debug
     if debug:
@@ -256,17 +256,31 @@ def balance(response):
         pprint.pprint(response)
         print()
     
-    # Mapping balance
+    # Mapping equity
     try:
         details = response.get("data", [])[0].get("details", [])
         if details and "eq" in details[0]:
-            balance = float(details[0].get("eq") or 0)
+            equity = float(details[0].get("eq") or 0)
+    except (IndexError, ValueError, TypeError):
+        pass  
+
+    # Mapping available balance
+    try:
+        details = response.get("data", [])[0].get("details", [])
+        if details and "eq" in details[0]:
+            available = float(details[0].get("availBal") or 0)
     except (IndexError, ValueError, TypeError):
         pass  
     
+    # Assign to balances
+    balances['available'] = available
+    balances['equity']    = equity
+    
     # Debug
     if debug:
-        defs.announce(f"Debug: After decode balance: {balance}")
+        defs.announce(f"Debug: After decode balance:")
+        pprint.pprint(balances)
+        print()
     
     # Return balance
-    return balance
+    return balances

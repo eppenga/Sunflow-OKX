@@ -355,6 +355,7 @@ def place_order(active_order):
     error_msg  = ""
     rate_limit = False    
 
+    # Debug to stdout
     if debug:
         defs.announce(f"Debug: Trying to place {active_order['side']} algo order")
         print(f"instId      = {config.symbol}")
@@ -387,6 +388,68 @@ def place_order(active_order):
             
         except Exception as e:
             message = f"*** Error: Failed to place {active_order['side']} order ***\n>>> Message: {e}"
+            defs.log_error(message)
+
+        # Log response
+        if config.exchange_log:
+            defs.log_exchange(response, message)
+
+        # Check response for errors
+        result     = check_response(response)
+        error_code = result[4]
+        error_msg  = result[5]
+
+        # Check API rate limit
+        rate_limit = check_limit(result[0], result[2])
+        
+        # Break out of loop
+        if not rate_limit: break
+
+    # Debug to stdout
+    if debug:
+        defs.announce("Debug: Exchange response:")
+        pprint.pprint(response)
+        print()
+
+    # Return data
+    return response, error_code, error_msg
+
+# Post order
+def place_market_order(qty):
+
+    # Debug
+    debug = False
+    
+    # Initialize variables
+    response   = {}
+    error_code = 0
+    error_msg  = ""
+    rate_limit = False    
+
+    # Debug to stdout
+    if debug:
+        defs.announce(f"Debug: Trying to place market order")
+        print(f"instId      = {config.symbol}")
+        print(f"tdMode      = cash")
+        print(f"side        = buy")
+        print(f"ordType     = market")
+        print(f"sz          = {qty}")
+        print(f"tgtCcy      = base_ccy\n")
+
+    # Get response
+    for attempt in range(3):
+        message = defs.announce("session: tradeAPI.place_order()")
+        try:
+            response = tradeAPI.place_order(
+                instId  = config.symbol,
+                tdMode  = "cash",
+                side    = "buy",
+                ordType = "market",
+                sz      = str(qty),
+                tgtCcy  = "base_ccy"
+            )           
+        except Exception as e:
+            message = f"*** Error: Failed to place order ***\n>>> Message: {e}"
             defs.log_error(message)
 
         # Log response

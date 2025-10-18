@@ -318,6 +318,47 @@ def check_sell(spot, profit, active_order, all_buys, use_pricelimit, pricelimit_
     # Return data
     return all_sells, qty, can_sell, rise_to
         
+# Do we have enough funds to buy
+def check_buy(info):
+
+    # Debug and speed
+    debug = True
+    speed = True
+    stime = defs.now_utc()[4]
+    
+    # Initialize variables
+    result     = ()
+    error_code = 0
+    error_msg  = ""
+    required   = info['buyQuote'] * config.equity_multiplier
+    required   = defs.round_number(required, info['quotePrecision'])
+
+    # Report to stdout
+    defs.announce(f"Checking if we have enough funds to buy")
+
+    # Get balances
+    result     = get_balance(info['quoteCoin'])
+    balances   = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
+       
+    # Debug
+    if debug:
+        print(f"Quote assets equity    = {balances['equity']} {info['quoteCoin']}")
+        print(f"Quote assets available = {balances['available']} {info['quoteCoin']}")        
+        print(f"Required for trading   = {required} {info['quoteCoin']}\n")
+
+    # Check if we have enough to buy
+    if required > balances['equity']:
+        message = f"*** Error: You need to have more than {required} {info['quoteCoin']} free to trade! ***"
+        defs.log_error(message)
+        
+    # Report execution time
+    if speed: defs.announce(defs.report_exec(stime))
+
+    # Return
+    return
+
 # New buy order
 def buy(spot, compounding, active_order, all_buys, prices, info):
 
@@ -352,7 +393,10 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     active_order = distance.calculate(active_order, prices)
 
     # Initialize trigger price and quantity
-    active_order = set_trigger(spot, active_order, info)  
+    active_order = set_trigger(spot, active_order, info)
+    
+    # Check for enough equity
+    if config.equity_check: check_buy(info)
 
     # Place buy order
     result     = exchange.place_order(active_order)
@@ -529,7 +573,7 @@ def get_balance(currency):
     stime = defs.now_utc()[4]
 
     # Initialize variables
-    balance    = 0
+    balances   = {}
     response   = {}
     result     = ()
     error_code = 0
@@ -545,17 +589,19 @@ def get_balance(currency):
         defs.log_error(message)
        
     # Decode balance
-    balance = decode.balance(response)
-
+    balances = decode.balance(response)
+       
     # Debug to stdout
     if debug:
-        defs.announce(f"Debug: Balance information: {balance}")
+        defs.announce(f"Debug: Balance information:")
+        pprint.pprint(balances)
+        print()
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
 
     # Return balance
-    return balance, error_code, error_msg
+    return balances, error_code, error_msg
 
 # Rebalances the database vs exchange by removing orders with the highest price
 def rebalance(all_buys, info):
@@ -566,42 +612,42 @@ def rebalance(all_buys, info):
     stime = defs.now_utc()[4]
 
     # Initialize variables
-    equity_balance = 0
-    equity_dbase   = 0
-    equity_diff    = 0
-    equity_remind  = 0
-    equity_lost    = 0
-    dbase_changed  = False
-    result         = ()
-    error_code     = 0
-    error_msg      = ""
+    equity_exchange = 0
+    equity_database = 0
+    equity_diff     = 0
+    equity_remember = 0
+    equity_lost     = 0
+    dbase_changed   = False
+    result          = ()
+    error_code      = 0
+    error_msg       = ""
 
     # Debug to stdout
     if debug:
         defs.announce("Debug: Trying to rebalance buys database with exchange data")
    
     # Get equity for basecoin
-    result         = get_balance(info['baseCoin'])
-    equity_balance = result[0]
-    error_code     = result[1]
-    error_msg      = result[2]
+    result          = get_balance(info['baseCoin'])
+    equity_exchange = result[0]['equity']
+    error_code      = result[1]
+    error_msg       = result[2]
     if error_code != 0:
         message = f"*** Error: Failed to get balance! ***\n>>> Message: {error_code} - {error_msg}"
         defs.log_error(message)
   
     # Get equity from all buys for basecoin
-    equity_dbase  = float(sum(order['cumExecQty'] for order in all_buys))
-    equity_remind = float(equity_dbase)
-    equity_diff   = equity_balance - equity_dbase
+    equity_database = float(sum(order['cumExecQty'] for order in all_buys))
+    equity_remember = float(equity_database)
+    equity_diff     = equity_exchange - equity_database
 
     # Debug to stdout
     if debug:
-        defs.announce(f"Debug: Before: Rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
-        defs.announce(f"Debug: Before: Rebalance equity in database: {equity_dbase} {info['baseCoin']}")
-        defs.announce(f"Debug: Before: Exchange equity including margin: {equity_balance * (1 + (config.rebalance_margin / 100))}")
+        defs.announce(f"Debug: Before: Rebalance equity on exchange: {equity_exchange} {info['baseCoin']}")
+        defs.announce(f"Debug: Before: Rebalance equity in database: {equity_database} {info['baseCoin']}")
+        defs.announce(f"Debug: Before: Exchange equity including margin: {equity_exchange * (1 + (config.rebalance_margin / 100))}")
 
     # Selling more than we have
-    while equity_dbase > equity_balance * (1 + (config.rebalance_margin / 100)):
+    while equity_database > equity_exchange * (1 + (config.rebalance_margin / 100)):
         
         # Database changed
         dbase_changed = True
@@ -615,16 +661,16 @@ def rebalance(all_buys, info):
         all_buys = database.remove_buy(highest_avg_price_item['orderid'], all_buys, info)
         
         # Recalculate all buys
-        equity_dbase = sum(order['cumExecQty'] for order in all_buys)    
+        equity_database = sum(order['cumExecQty'] for order in all_buys)    
 
     # Debug to stdout
     if debug:
-        defs.announce(f"Debug: After: Rebalance equity on exchange: {equity_balance} {info['baseCoin']}")
-        defs.announce(f"Debug: After: Rebalance equity in database: {equity_dbase} {info['baseCoin']}")
+        defs.announce(f"Debug: After: Rebalance equity on exchange: {equity_exchange} {info['baseCoin']}")
+        defs.announce(f"Debug: After: Rebalance equity in database: {equity_database} {info['baseCoin']}")
 
     # Save new database
     if dbase_changed:
-        equity_lost = equity_remind - equity_dbase
+        equity_lost = equity_remember - equity_database
         defs.announce(f"Rebalanced buys database with exchange data and lost {defs.format_number(equity_lost, info['basePrecision'])} {info['baseCoin']}")
         database.save(all_buys, info)
     
@@ -658,7 +704,7 @@ def report_balances(spot, all_buys, info):
       
     # Get balance for base currency
     result        = get_balance(info['baseCoin'])
-    base_exchange = result[0]
+    base_exchange = result[0]['equity']
     error_code    = result[1]
     error_msg     = result[2]
     if error_code != 0:
@@ -667,7 +713,7 @@ def report_balances(spot, all_buys, info):
     
     # Get balance for quote currency
     result         = get_balance(info['quoteCoin'])
-    quote_exchange = result[0]
+    quote_exchange = result[0]['equity']
     error_code     = result[1]
     error_msg      = result[2]
     if error_code != 0:

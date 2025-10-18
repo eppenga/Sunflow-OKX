@@ -807,7 +807,10 @@ if config.balance_report:
 # Preload compounding
 if compounding['enabled']:
     info = defs.calc_compounding(info, spot, compounding)
-    
+
+# Check funds
+if config.equity_check:
+    orders.check_buy(info)
 
 ## TESTS ##
 print("\n*** Preloading report ***")
