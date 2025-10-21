@@ -342,7 +342,7 @@ def handle_ticker(message):
                 if (active_order['qty_new'] != active_order['qty']) and (active_order['qty_new'] >= info['minOrderQty']):
 
                     # Amend order quantity
-                    result        = trailing.adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info)
+                    result        = trailing.adjust_qty(active_order, all_buys, all_sells, all_sells_new, compounding, spot, info)
                     active_order  = result[0]
                     all_sells     = result[1]
                     all_sells_new = result[2]
@@ -995,9 +995,9 @@ class Runner:
         finally:
             # Always try to clean up
             with contextlib.suppress(Exception):
-                await ws.unsubscribe(self.subs)
+                await ws.unsubscribe(self.subs, self.callback)
             with contextlib.suppress(Exception):
-                await ws.close()
+                await ws.factory.close()
 
     async def run_forever(self):
         backoff = 1

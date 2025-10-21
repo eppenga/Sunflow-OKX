@@ -424,7 +424,7 @@ def trail(spot, compounding, active_order, info, all_buys, all_sells, prices):
     return active_order, all_buys, compounding, info
 
 # Change trigger price current trailing sell helper
-def adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info):
+def adjust_qty(active_order, all_buys, all_sells, all_sells_new, compounding, spot, info):
 
     # Initialize variables
     debug      = False
@@ -473,7 +473,7 @@ def adjust_qty(active_order, all_sells, all_sells_new, compounding, spot, info):
         defs.log_error(message)
 
     # Check order to be sure
-    if go_check:
+    if go_check:       
         result       = check_order(spot, compounding, active_order, all_buys, all_sells, info, True)
         active_order = result[0]
         all_buys     = result[1]

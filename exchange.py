@@ -636,7 +636,7 @@ def cancel_order(orderid):
                 instId         = config.symbol,
                 algoId         = str(orderid),
                 newSlTriggerPx = '0',
-                cxlOnFail      = True
+                cxlOnFail      = "true"
             )
         except Exception as e:
             message = f"*** Error: Failed to cancel order {orderid} ***\n>>> Message: {e}"

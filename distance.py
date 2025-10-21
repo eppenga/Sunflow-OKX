@@ -47,7 +47,7 @@ def calculate_atr():
     # Get ATR klines if required
     if get_atr_klines:
         start_time = defs.now_utc()[4]
-        atr_klines = preload.get_klines(config.symbol, '1m', config.limit)
+        atr_klines = preload.get_klines('1m', config.limit)
         end_time   = defs.now_utc()[4]
         defs.announce(f"Received {config.limit} ATR klines in {end_time - start_time}ms")
     
