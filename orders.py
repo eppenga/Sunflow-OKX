@@ -322,7 +322,7 @@ def check_sell(spot, profit, active_order, all_buys, use_pricelimit, pricelimit_
 def check_buy(info):
 
     # Debug and speed
-    debug = True
+    debug = False
     speed = True
     stime = defs.now_utc()[4]
     

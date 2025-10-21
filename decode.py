@@ -248,7 +248,9 @@ def balance(response):
     debug = False
     
     # Initialize variables
-    balances = {}
+    balances  = {}
+    equity    = 0
+    available = 0
 
     # Debug
     if debug:
@@ -262,7 +264,7 @@ def balance(response):
         if details and "eq" in details[0]:
             equity = float(details[0].get("eq") or 0)
     except (IndexError, ValueError, TypeError):
-        pass  
+        pass
 
     # Mapping available balance
     try:
