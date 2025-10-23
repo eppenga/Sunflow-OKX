@@ -415,8 +415,8 @@ def distance_adaptive(active_order, prices, price_distance):
     # Return active_order
     return active_order
 
-# Intelligent trigger distance calculator combining ATR, Wave, and EMA stability with adaptive regime detection (trending vs. ranging)
-def distance_intelligent(active_order, prices, price_distance):
+# Smart trigger distance calculator combining ATR, Wave, and EMA stability with adaptive regime detection (trending vs. ranging)
+def distance_smart(active_order, prices, price_distance):
 
     # === 1. Get ATR data ===
     atr_percentage, atr_avg, atr_mult = calculate_atr()
@@ -533,9 +533,9 @@ def calculate(active_order, prices):
     if active_order['wiggle'] == "Adaptive":
         active_order = distance_adaptive(active_order, prices, price_distance)
 
-    ''' Use INTELLIGENT to set distance '''
-    if active_order['wiggle'] == "Intelligent":
-        active_order = distance_intelligent(active_order, prices, price_distance)
+    ''' Use SMART to set distance '''
+    if active_order['wiggle'] == "Smart":
+        active_order = distance_smart(active_order, prices, price_distance)
 
     # Report to stdout
     if previous_fluctuation != active_order['fluctuation']:
