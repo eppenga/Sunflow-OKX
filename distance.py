@@ -199,7 +199,6 @@ def protect_adaptive(active_order, price_distance):
     # Return active_order
     return active_order
 
-
 # Calculate distance using fixed
 def distance_fixed(active_order):
     
