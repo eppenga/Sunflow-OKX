@@ -129,6 +129,7 @@ active_order['distance']             = config.wave_distance                     
 active_order['distance_ini']         = config.wave_distance                        # Keep initial distance always stored
 active_order['fluctuation']          = config.wave_distance                        # Trigger price distance percentage when set to wiggle
 active_order['wave']                 = config.wave_distance                        # Trigger price distance percentage when set to wave
+active_order['regime']               = ""                                          # Regime used to calculate distance when set to intelligent
 active_order['orderid']              = ""                                          # Order ID
 active_order['linkedid']             = ""                                          # Linked SL order ID
 active_order['trigger']              = 0                                           # Trigger price for order
