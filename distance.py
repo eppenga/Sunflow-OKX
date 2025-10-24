@@ -39,7 +39,7 @@ def calculate_atr():
         atr_timer['check'] = False
         atr_timer['time']  = current_time
     if current_time - atr_timer['time'] > atr_timer['interval']:
-        defs.announce(f"Requesting {config.limit} klines for ATR")
+        defs.announce(f"Requesting {config.prices_limit} klines for ATR")
         atr_timer['check'] = True
         atr_timer['time']  = 0
         get_atr_klines = True
@@ -47,9 +47,9 @@ def calculate_atr():
     # Get ATR klines if required
     if get_atr_klines:
         start_time = defs.now_utc()[4]
-        atr_klines = preload.get_klines('1m', config.limit)
+        atr_klines = preload.get_klines('1m', config.prices_limit)
         end_time   = defs.now_utc()[4]
-        defs.announce(f"Received {config.limit} ATR klines in {end_time - start_time}ms")
+        defs.announce(f"Received {config.prices_limit} ATR klines in {end_time - start_time}ms")
     
     # Initialize dataframe
     df = pd.DataFrame(atr_klines)
@@ -67,7 +67,7 @@ def calculate_atr():
     if get_atr_klines:
         print("ATR Data (experimental)")
         print(f"ATR current percentage is {atr_percentage} %")
-        print(f"ATR average percentage over {config.limit} klines is {atr_perc_avg} %")
+        print(f"ATR average percentage over {config.prices_limit} klines is {atr_perc_avg} %")
         print(f"ATR multiplier is {atr_multiplier}\n")
 
    # Debug to stdout
@@ -237,7 +237,7 @@ def distance_ema(active_order, prices, price_distance):
     scaler = 1
     
     # Number of prices to use
-    number = defs.get_index_number(prices, config.timeframe, config.limit)
+    number = defs.get_index_number(prices, config.timeframe, config.prices_limit)
 
     # Convert the lists to a pandas DataFrame
     df = pd.DataFrame({
@@ -277,7 +277,7 @@ def distance_hybrid(active_order, prices, price_distance):
     scaler = 2
 
     # Number of prices to use
-    number = defs.get_index_number(prices, config.wave_timeframe, config.limit)
+    number = defs.get_index_number(prices, config.wave_timeframe, config.prices_limit)
     
     # Adaptive EMA span based on volatility
     recent_prices = pd.Series(prices['price'][-number:])      # Get recent prices
