@@ -204,7 +204,7 @@ def merge_order_fills(order, fills, info):
 # Initialize active order for initial buy or sell
 def set_trigger(spot, active_order, info):
 
-    # Debug
+    # Report to stdout
     defs.announce(f"Trigger price distance {active_order['fluctuation']:.4f} % and price {defs.format_number(spot, info['tickSize'])} {info['quoteCoin']}")
 
     # Set quantity at OKX we can always trade in base
@@ -657,7 +657,6 @@ def rebalance(all_buys, info):
 
         # Remove this item from the list
         if debug: defs.announce(f"Debug: Going to remove order {highest_avg_price_item['orderid']} from all_buys database")
-        exit()
         all_buys = database.remove_buy(highest_avg_price_item['orderid'], all_buys, info)
         
         # Recalculate all buys

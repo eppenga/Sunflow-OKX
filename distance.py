@@ -79,124 +79,121 @@ def calculate_atr():
 
 # Protect buy and sell
 def protect(active_order, price_distance):
-    
+
     # Debug
     debug = False
-    
+
     # Initialize variables
-    show_distance = False
+    side        = active_order['side']        # Buy or Sell
+    default     = active_order['distance']    # Default distance
+    wave        = active_order['wave']        # Wave distance
+    #fluctuation = active_order['fluctuation']        # Wave distance
+
+    # Direction normalization
+    if side == "Buy":
+        price_distance *= -1
+        wave           *= -1
     
+    # Set the fluctuation to wave so it gets the calculated value immediately
+    fluctuation = wave
+
     # Debug to stdout
     if debug:
         defs.announce("Debug: Distances before")
-        print(f"Trailing side       : {active_order['side']}")
-        print(f"Default distance    : {active_order['distance']:.4f} %")
+        print(f"Side                : {side}")
+        print(f"Default distance    : {default:.4f} %")
         print(f"Price distance      : {price_distance:.4f} %")
-        print(f"Wave distance       : {active_order['wave']:.4f} %\n")
-        print(f"Fluctuation distance: {active_order['fluctuation']:.4f} %")
+        print(f"Wave distance       : {wave:.4f} %")
+        print(f"Final fluctuation   : {fluctuation:.4f} %\n")
+
+    # Optional: Enforce a minimum distance
+    if config.protect_minimum:
+        if fluctuation < default:
+            fluctuation = default
     
-    # Selling
-    if active_order['side'] == "Sell":
+    # Optional: Once price distance is beyond default, allow to use smaller values
+    if config.protect_peaks:
+        if (fluctuation < default) and (price_distance > default):
+            fluctuation = wave
 
-        # Set standard distance
-        active_order['fluctuation'] = active_order['wave']
+    # Prevent stop from moving beyond the profitable zone
+    if side == "Sell":
+        profitable = price_distance + default
+        if fluctuation > profitable:
+            fluctuation = profitable
 
-        # Prevent selling at a loss
-        profitable = price_distance + active_order['distance']
-        if active_order['wave'] > profitable:
-            active_order['fluctuation'] = profitable
-                        
-        # If price distance is larger than default, use smaller distances *** CHECK *** Maybe this can be better
-        if config.protect_peaks:
-            if active_order['wave'] < active_order['distance']:
-                if price_distance > active_order['distance']:
-                    if active_order['wave'] > 0:
-                        active_order['fluctuation'] = active_order['wave']
-                else:
-                    active_order['fluctuation'] = active_order['distance']
-                
-    # Buying
-    if active_order['side'] == "Buy":
-        
-        # Reverse wave and price difference for buying logic
-        active_order['wave'] = active_order['wave'] * -1
-        price_distance       = price_distance * -1
+    # Safety checks
+    if (fluctuation < 0) or (math.isnan(fluctuation)) or (math.isinf(fluctuation)):
+        defs.announce(f"*** Warning: Fluctuation distance is {fluctuation:.4f} %, enforcing 0.0000 %! ***")
+        fluctuation = 0
 
-        # Set standard distance
-        active_order['fluctuation'] = active_order['wave']
-        
-        # Use minimum distance
-        if active_order['wave'] < active_order['distance']:
-            active_order['fluctuation'] = active_order['distance']
-
-        # If price distance is larger than default, use smaller distances *** CHECK *** Maybe this can be better
-        if config.protect_peaks:
-            if active_order['wave'] < active_order['distance']:
-                if price_distance > active_order['distance']:
-                    if active_order['wave'] > 0:
-                        active_order['fluctuation'] = active_order['wave']
-                else:
-                    active_order['fluctuation'] = active_order['distance']
+    # Set fluctuation
+    active_order['fluctuation'] = fluctuation
 
     # Debug to stdout
     if debug:
         defs.announce("Debug: Distances after")
-        print(f"Trailing side       : {active_order['side']}")
-        print(f"Default distance    : {active_order['distance']:.4f} %")
+        print(f"Side                : {side}")
+        print(f"Default distance    : {default:.4f} %")
         print(f"Price distance      : {price_distance:.4f} %")
-        print(f"Wave distance       : {active_order['wave']:.4f} %")
-        print(f"Fluctuation distance: {active_order['fluctuation']:.4f} %\n")
+        print(f"Wave distance       : {wave:.4f} %")
+        print(f"Final fluctuation   : {fluctuation:.4f} %\n")
 
-    # Last failsafe
-    if active_order['fluctuation'] < 0:
-        defs.announce(f"*** Warning: Fluctuation distance is {active_order['fluctuation']:.4f} %, enforcing 0.0000 %! ***")
-        active_order['fluctuation'] = 0
-    
     # Return active_order
     return active_order
 
-# Adaptive protection logic that respects regime, side, and volatility.
-def protect_adaptive(active_order, price_distance):
+# Adaptive protection logic that dynamically adjusts trailing distance based on side, regime, ATR, wave strength, and EMA stability.
+def protect_respect(active_order, price_distance):
 
-    # Base variables
-    side       = active_order['side']
-    fluct      = active_order['fluctuation']
-    dist       = active_order['distance']
-    wave       = active_order.get('wave', 0)
-    regime     = active_order.get('regime', 'Unknown')
-    price_diff = price_distance
+    # Initialize variables
+    side        = active_order['side']
+    base_dist   = active_order['distance']
+    wave        = active_order.get('wave', 0)
+    regime      = active_order.get('regime', 'Calm')
+    fluctuation = active_order.get('fluctuation', wave)
+    price_diff  = price_distance
 
-    # Define regime-based safety factors (tighter for ranging)
-    safety = {
-        'Trending': 0.8,   # allow 80% of profit swing before protect
-        'Ranging': 1.2,    # tighten sooner
-        'Calm': 1.0        # neutral
-    }.get(regime, 1.0)
-
-    # --- SELL SIDE ---
-    if side == "Sell":
-        # Never sell at a loss: trailing stop cannot move above entry + base distance
-        min_safe = max(wave, price_diff + dist)
-        if fluct > min_safe * safety:
-            fluct = min_safe * safety
-
-    # --- BUY SIDE ---
-    elif side == "Buy":
-        # Flip signs for buy logic
-        wave *= -1
+    # Normalize for Buy side
+    if side == "Buy":
         price_diff *= -1
-        min_safe = max(wave, price_diff + dist)
-        if fluct > min_safe * safety:
-            fluct = min_safe * safety
+        wave       *= -1
+        fluctuation = wave
 
-    # Enforce floor
-    if fluct < 0:
-        fluct = 0
+    # --- 1. Regime-based safety factor ---
+    # Trending: looser trailing, Ranging: tighter trailing
+    safety_factors = {
+        "Trending": 0.85,  # allow trailing further from profit
+        "Ranging": 1.2,    # tighten trailing to protect gains
+        "Calm": 1.0        # neutral
+    }
+    safety = safety_factors.get(regime, 1.0)
 
-    # Assign final fluctuation
-    active_order['fluctuation'] = fluct
+    # --- 2. Ensure minimum distance ---
+    fluctuation = max(fluctuation, base_dist)
 
-    # Return active_order
+    # --- 3. Allow smaller fluctuation if price exceeded default distance (protect peaks) ---
+    if config.protect_peaks:
+        if (fluctuation < base_dist) and (price_diff > base_dist):
+            fluctuation = wave
+
+    # --- 4. Ensure not exceeding profitable zone ---
+    if side == "Sell":
+        profitable_max = price_diff + base_dist
+        if fluctuation > profitable_max * safety:
+            fluctuation = profitable_max * safety
+    elif side == "Buy":
+        profitable_max = price_diff + base_dist
+        if fluctuation > profitable_max * safety:
+            fluctuation = profitable_max * safety
+
+    # --- 5. Safety checks ---
+    if fluctuation < 0 or math.isnan(fluctuation) or math.isinf(fluctuation):
+        defs.announce(f"*** Warning: Fluctuation distance invalid ({fluctuation:.4f}%), enforcing 0.0000%! ***")
+        fluctuation = 0
+
+    # --- 6. Assign final fluctuation ---
+    active_order['fluctuation'] = fluctuation
+
     return active_order
 
 # Calculate distance using fixed
@@ -378,7 +375,7 @@ def distance_adaptive(active_order, prices, price_distance):
     atr_percentage, atr_avg, atr_mult = calculate_atr()
 
     # Wave Strength
-    wave_order = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
+    wave_order    = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
     wave_strength = abs(wave_order['wave'])
 
     # EMA Stability
@@ -409,7 +406,7 @@ def distance_adaptive(active_order, prices, price_distance):
     active_order['fluctuation'] = adaptive_distance
     
     # Prevent sell at loss and other issues    
-    active_order = protect(active_order, price_distance)
+    active_order = protect_respect(active_order, price_distance)
 
     # Return active_order
     return active_order
@@ -421,7 +418,7 @@ def distance_smart(active_order, prices, price_distance):
     atr_percentage, atr_avg, atr_mult = calculate_atr()
 
     # === 2. Wave detection (short-term momentum) ===
-    wave_order = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
+    wave_order    = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
     wave_strength = abs(wave_order['wave'])  # magnitude of short-term movement
 
     # === 3. EMA-based trend stability ===
@@ -462,8 +459,8 @@ def distance_smart(active_order, prices, price_distance):
 
     # === 6. Composite adaptive multiplier ===
     adaptive_mult = (
-        (atr_mult * w_atr) +          # volatility component
-        (wave_strength * w_wave) +    # recent momentum component
+        (atr_mult * w_atr) +            # volatility component
+        (wave_strength * w_wave) +      # recent momentum component
         ((1 - ema_stability) * w_stab)  # trend stability inverse (more chaos → more distance)
     )
 
@@ -475,12 +472,12 @@ def distance_smart(active_order, prices, price_distance):
     adaptive_distance = max(base_distance * 0.8, min(adaptive_distance, base_distance * 3))
 
     # === 8. Assign results ===
-    active_order['wave'] = wave_strength
+    active_order['wave']        = wave_strength
     active_order['fluctuation'] = adaptive_distance
-    active_order['regime'] = regime
-
+    active_order['regime']      = regime
+    
     # === 9. Apply protection logic ===
-    active_order = protect_adaptive(active_order, price_distance)
+    active_order = protect_respect(active_order, price_distance)
 
     # === 10. Optional debug ===
     defs.announce(f"[{regime}] distance={adaptive_distance:.4f}% | ATRx={atr_mult:.2f} | Wave={wave_strength:.2f} | Stability={ema_stability:.2f}")
