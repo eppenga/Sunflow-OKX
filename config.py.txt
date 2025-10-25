@@ -12,6 +12,7 @@ spike_margin            = 1.00         # Margin in percent to prevent false spik
 
 # Wave
 wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot, Wave, ATR, EMA or Hybrid
+wave_start              = False        # Use default distance (please see below, True) or start of using market data (False)
 wave_distance           = 0.080        # Trigger price distance percentage when Fixed is used by wiggle
 wave_timeframe          = 5000         # Timeframe in ms to measure wave length, used when wiggle uses Wave, EMA or Hybrid
 wave_multiplier         = 1.00         # Multiply wave percentage by this multiplier
@@ -110,6 +111,10 @@ dbase_file              = data_suffix + "orders.json"                # Database 
 exchange_file           = data_suffix + "exchange.log"               # Exchange log file
 error_file              = data_suffix + "errors.log"                 # Error log file
 revenue_file            = data_suffix + "revenue.log"                # Revenue log file
+
+# Notify using Apprise (https://github.com/caronc/apprise)
+notify_enabled          = False                                       # Messaging clients (usually Telegram)
+notify_url              = ["protocal://key@host?parameters"]
 
 # Debug, logs, reporting and other switches
 debug                   = False                                      # Turn debug on or off

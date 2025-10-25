@@ -1165,7 +1165,7 @@ async def main():
 
     # Create tasks for runners
     tasks = [asyncio.create_task(r.run_forever(), name=f"runner-{i}") for i, r in enumerate(runners)]
-    for t in tasks:  # NEW: attach crash logger
+    for t in tasks:
         t.add_done_callback(_log_task_result)
 
     # Seed global state for watchers

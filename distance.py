@@ -64,11 +64,11 @@ def calculate_atr():
     end_time       = defs.now_utc()[4]
 
     # Report ATR data
-    if get_atr_klines:
+    if debug and get_atr_klines:
         print("ATR Data (experimental)")
-        print(f"ATR current percentage is {atr_percentage} %")
-        print(f"ATR average percentage over {config.prices_limit} klines is {atr_perc_avg} %")
-        print(f"ATR multiplier is {atr_multiplier}\n")
+        print(f"ATR current percentage is {atr_percentage:.4f} %")
+        print(f"ATR average percentage over {config.prices_limit:.4f} klines is {atr_perc_avg} %")
+        print(f"ATR multiplier is {atr_multiplier:.2f}\n")
 
    # Debug to stdout
     if debug:
@@ -87,16 +87,13 @@ def protect(active_order, price_distance):
     side        = active_order['side']        # Buy or Sell
     default     = active_order['distance']    # Default distance
     wave        = active_order['wave']        # Wave distance
-    #fluctuation = active_order['fluctuation']        # Wave distance
+    fluctuation = active_order['wave']        # Trigger price distance
 
     # Direction normalization
     if side == "Buy":
         price_distance *= -1
         wave           *= -1
     
-    # Set the fluctuation to wave so it gets the calculated value immediately
-    fluctuation = wave
-
     # Debug to stdout
     if debug:
         defs.announce("Debug: Distances before")
@@ -114,7 +111,17 @@ def protect(active_order, price_distance):
     # Optional: Once price distance is beyond default, allow to use smaller values
     if config.protect_peaks:
         if (fluctuation < default) and (price_distance > default):
+
+            # Price distance is above default
             fluctuation = wave
+        
+        elif config.wave_start:
+            # Price distance is below default and use default distance
+            fluctuation = default
+
+        else:
+            # Price distance is below default and use market data to set distance
+            fluctuation = wave            
 
     # Prevent stop from moving beyond the profitable zone
     if side == "Sell":
