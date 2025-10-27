@@ -513,7 +513,7 @@ def adjust_qty_order(active_order, info):
 
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Amended quantity sell order")
+        defs.announce("Debug: Adjusted quantity sell order")
         pprint.pprint(response)
         print()
 
@@ -598,8 +598,9 @@ def adjust_tp_order(active_order, info):
     error_msg  = ""
        
     # Report to stdout
-    message = f"Trying to adjust trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
-    message = message + f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']}"
+    message  = f"Adjusting trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
+    message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} "
+    message += f"at price {defs.format_number(active_order['current'], info['tickSize'])}"
     defs.announce(message)
    
     # Amend order for price
@@ -614,7 +615,7 @@ def adjust_tp_order(active_order, info):
  
     # Debug to stdout
     if debug:
-        defs.announce("Debug: Amended trigger price order")
+        defs.announce("Debug: Adjusted trigger price order")
         pprint.pprint(response)
         print()
         

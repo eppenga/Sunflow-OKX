@@ -3,6 +3,7 @@
 # Calculate trigger price distance
 
 # Load external libraries
+import numpy as np
 import math, pandas as pd, pandas_ta as ta
 
 # Load internal libraries
@@ -39,7 +40,7 @@ def calculate_atr():
         atr_timer['check'] = False
         atr_timer['time']  = current_time
     if current_time - atr_timer['time'] > atr_timer['interval']:
-        defs.announce(f"Requesting {config.prices_limit} klines for ATR")
+        defs.announce(f"Requesting {config.limit} klines for ATR")
         atr_timer['check'] = True
         atr_timer['time']  = 0
         get_atr_klines = True
@@ -47,9 +48,9 @@ def calculate_atr():
     # Get ATR klines if required
     if get_atr_klines:
         start_time = defs.now_utc()[4]
-        atr_klines = preload.get_klines('1m', config.prices_limit)
+        atr_klines = preload.get_klines('1m', config.limit)
         end_time   = defs.now_utc()[4]
-        defs.announce(f"Received {config.prices_limit} ATR klines in {end_time - start_time}ms")
+        defs.announce(f"Received {config.limit} ATR klines in {end_time - start_time}ms")
     
     # Initialize dataframe
     df = pd.DataFrame(atr_klines)
@@ -64,11 +65,11 @@ def calculate_atr():
     end_time       = defs.now_utc()[4]
 
     # Report ATR data
-    if debug and get_atr_klines:
+    if get_atr_klines:
         print("ATR Data (experimental)")
-        print(f"ATR current percentage is {atr_percentage:.4f} %")
-        print(f"ATR average percentage over {config.prices_limit:.4f} klines is {atr_perc_avg} %")
-        print(f"ATR multiplier is {atr_multiplier:.2f}\n")
+        print(f"ATR current percentage is {atr_percentage} %")
+        print(f"ATR average percentage over {config.limit} klines is {atr_perc_avg} %")
+        print(f"ATR multiplier is {atr_multiplier}\n")
 
    # Debug to stdout
     if debug:
@@ -104,33 +105,23 @@ def protect(active_order, price_distance):
         print(f"Final fluctuation   : {fluctuation:.4f} %\n")
 
     # Optional: Enforce a minimum distance
-    if config.protect_minimum:
+    if config.wave_minimum:
         if fluctuation < default:
             fluctuation = default
     
-    # Optional: Once price distance is beyond default, allow to use smaller values
-    if config.protect_peaks:
+    # Optional: Price distance is above default, possibly override the above
+    if config.wave_peaks:
         if (fluctuation < default) and (price_distance > default):
-
-            # Price distance is above default
-            fluctuation = wave
-        
-        elif config.wave_start:
-            # Price distance is below default and use default distance
-            fluctuation = default
-
-        else:
-            # Price distance is below default and use market data to set distance
-            fluctuation = wave            
+            fluctuation = wave        
 
     # Prevent stop from moving beyond the profitable zone
     if side == "Sell":
         profitable = price_distance + default
         if fluctuation > profitable:
             fluctuation = profitable
-
+    
     # Safety checks
-    if (fluctuation < 0) or (math.isnan(fluctuation)) or (math.isinf(fluctuation)):
+    if (fluctuation is None) or (fluctuation < 0) or (math.isnan(fluctuation)) or (math.isinf(fluctuation)):
         defs.announce(f"*** Warning: Fluctuation distance is {fluctuation:.4f} %, enforcing 0.0000 %! ***")
         fluctuation = 0
 
@@ -149,65 +140,12 @@ def protect(active_order, price_distance):
     # Return active_order
     return active_order
 
-# Adaptive protection logic that dynamically adjusts trailing distance based on side, regime, ATR, wave strength, and EMA stability.
-def protect_respect(active_order, price_distance):
-
-    # Initialize variables
-    side        = active_order['side']
-    base_dist   = active_order['distance']
-    wave        = active_order.get('wave', 0)
-    regime      = active_order.get('regime', 'Calm')
-    fluctuation = active_order.get('fluctuation', wave)
-    price_diff  = price_distance
-
-    # Normalize for Buy side
-    if side == "Buy":
-        price_diff *= -1
-        wave       *= -1
-        fluctuation = wave
-
-    # --- 1. Regime-based safety factor ---
-    # Trending: looser trailing, Ranging: tighter trailing
-    safety_factors = {
-        "Trending": 0.85,  # allow trailing further from profit
-        "Ranging": 1.2,    # tighten trailing to protect gains
-        "Calm": 1.0        # neutral
-    }
-    safety = safety_factors.get(regime, 1.0)
-
-    # --- 2. Ensure minimum distance ---
-    fluctuation = max(fluctuation, base_dist)
-
-    # --- 3. Allow smaller fluctuation if price exceeded default distance (protect peaks) ---
-    if config.protect_peaks:
-        if (fluctuation < base_dist) and (price_diff > base_dist):
-            fluctuation = wave
-
-    # --- 4. Ensure not exceeding profitable zone ---
-    if side == "Sell":
-        profitable_max = price_diff + base_dist
-        if fluctuation > profitable_max * safety:
-            fluctuation = profitable_max * safety
-    elif side == "Buy":
-        profitable_max = price_diff + base_dist
-        if fluctuation > profitable_max * safety:
-            fluctuation = profitable_max * safety
-
-    # --- 5. Safety checks ---
-    if fluctuation < 0 or math.isnan(fluctuation) or math.isinf(fluctuation):
-        defs.announce(f"*** Warning: Fluctuation distance invalid ({fluctuation:.4f}%), enforcing 0.0000%! ***")
-        fluctuation = 0
-
-    # --- 6. Assign final fluctuation ---
-    active_order['fluctuation'] = fluctuation
-
-    return active_order
-
 # Calculate distance using fixed
 def distance_fixed(active_order):
     
-    # Distance
+    # Set fluctuation and wave, no need to go through protect()
     active_order['fluctuation'] = active_order['distance']
+    active_order['wave']        = active_order['distance']
         
     # Return active_order
     return active_order
@@ -228,14 +166,51 @@ def distance_spot(active_order, price_distance):
     # Calculate trigger price distance percentage
     fluctuation = (1 / math.pow(10, 1/1.2)) * math.pow(fluc_price_distance, 1/1.2) + active_order['distance']
 
-    # Set fluctuation
+    # Set fluctuation, no need to go through protect()
     if fluctuation < active_order['distance']:
         active_order['fluctuation'] = active_order['distance']
     else:
         active_order['fluctuation'] = fluctuation
-
+        
+    # Set wave, to be compatible with the other distance functions
+    active_order['wave'] = active_order['fluctuation']
+    
     # Return active_order
     return active_order
+
+# Calculate distance using wave
+def distance_wave(active_order, prices, price_distance, prevent=True):
+    
+    # Debug
+    debug = False
+
+    # Time calculations
+    latest_time = prices['time'][-1]                # Get the latest time
+    span = latest_time - config.wave_timeframe      # timeframe in milliseconds
+
+    # Get the closest index in the time {timeframe}
+    closest_index = defs.get_closest_index(prices, span)
+
+    # Calculate the change in price
+    price_change      = 0
+    price_change_perc = 0
+    if closest_index is not None and prices['time'][-1] > span:
+        price_change      = prices['price'][-1] - prices['price'][closest_index]
+        price_change_perc = (price_change / prices['price'][closest_index]) * 100
+
+    # Set wave and apply wave multiplier
+    active_order['wave'] = price_change_perc * config.wave_multiplier
+
+    # Debug to stdout
+    if debug:
+        defs.announce(f"Debug: Price change in the last {config.wave_timeframe / 1000:.2f} seconds is {active_order['wave']:.2f} %")
+
+    # Prevent sell at loss and other issues
+    if prevent:
+        active_order = protect(active_order, price_distance)
+
+    # Return active_order
+    return active_order   
 
 # Calculate distance using EMA
 def distance_ema(active_order, prices, price_distance):
@@ -277,79 +252,6 @@ def distance_ema(active_order, prices, price_distance):
     # Return active_order
     return active_order
 
-# Calculate distance using hybrid
-def distance_hybrid(active_order, prices, price_distance):
-
-    # Devide normalized value by this, ie. 2 means it will range between 0 and 0.5
-    scaler = 2
-
-    # Number of prices to use
-    number = defs.get_index_number(prices, config.wave_timeframe, config.prices_limit)
-    
-    # Adaptive EMA span based on volatility
-    recent_prices = pd.Series(prices['price'][-number:])      # Get recent prices
-    volatility = recent_prices.std() / recent_prices.mean()   # Calculate volatility as a percentage
-    if math.isnan(volatility): volatility = 0                 # Safeguard volatilty
-    ema_span = max(5, int(number * (1 + volatility)))         # Adjust span based on volatility, minimum span of 5
-
-    # Convert the list to a pandas DataFrame
-    df = pd.DataFrame(prices['price'], columns=['price'])
-
-    # Calculate the periodic returns
-    df['returns'] = df['price'].pct_change()
-
-    # Apply an exponentially weighted moving standard deviation to the returns
-    df['ewm_std'] = df['returns'].ewm(span=ema_span, adjust=False).std()
-
-    # Normalize the last value of EWM_Std to a 0-1 scale
-    wave = df['ewm_std'].iloc[-1] / df['ewm_std'].max()
-
-    # Calculate dynamic scaler based on market conditions (here we just use the default scaler, but it could be dynamic)
-    dynamic_scaler = scaler
-
-    # Calculate trigger price distance percentage
-    active_order['wave'] = (wave / dynamic_scaler) + active_order['distance']
-
-    # Prevent sell at loss and other issues
-    active_order = protect(active_order, price_distance)
-    
-    # Return active_order
-    return active_order
-
-# Calculate distance using wave
-def distance_wave(active_order, prices, price_distance, prevent=True):
-    
-    # Debug
-    debug = False
-
-    # Time calculations
-    latest_time = prices['time'][-1]                # Get the latest time
-    span = latest_time - config.wave_timeframe      # timeframe in milliseconds
-
-    # Get the closest index in the time {timeframe}
-    closest_index = defs.get_closest_index(prices, span)
-
-    # Calculate the change in price
-    price_change      = 0
-    price_change_perc = 0
-    if closest_index is not None and prices['time'][-1] > span:
-        price_change      = prices['price'][-1] - prices['price'][closest_index]
-        price_change_perc = (price_change / prices['price'][closest_index]) * 100
-
-    # Apply wave multiplier
-    active_order['wave'] = price_change_perc * config.wave_multiplier
-
-    # Debug to stdout
-    if debug:
-        defs.announce(f"Debug: Price change in the last {config.wave_timeframe / 1000:.2f} seconds is {active_order['wave']:.2f} %")
-
-    # Prevent sell at loss and other issues
-    if prevent:
-        active_order = protect(active_order, price_distance)
-
-    # Return active_order
-    return active_order   
-
 # Calculate distance using wave taking ATR into account
 def distance_atr(active_order, prices, price_distance):
 
@@ -375,120 +277,187 @@ def distance_atr(active_order, prices, price_distance):
     # Return active_order
     return active_order
 
-# Calculate trigger distance dynamically using ATR + EMA + Wave
-def distance_adaptive(active_order, prices, price_distance):
+# Advanced adaptive distance calculation designed by ChatGPT :)
+def distance_chatgpt(active_order, prices, price_distance):
+    """
+    Highly adaptive trigger distance:
+      - Uses ATR (or percent stddev) as volatility baseline
+      - Uses EWMA of returns to detect trend strength and direction
+      - Computes candidate distances from Fixed/Spot/Wave
+      - Dynamically weights candidates based on volatility & trend
+      - Adds hysteresis and time-aware smoothing to prevent whipsaw
+      - Caps/flattens distances with profit-aware limits and config knobs
+    """
 
-    # Get ATR metrics
-    atr_percentage, atr_avg, atr_mult = calculate_atr()
+    # Debug toggle
+    debug = True
 
-    # Wave Strength
-    wave_order    = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
-    wave_strength = abs(wave_order['wave'])
+    now_ms = defs.now_utc()[4]  # existing helper returns time, index 4 is millis in your codebase
+    MIN_HISTORY = 20  # minimal price points to compute meaningful stats
 
-    # EMA Stability
-    df = pd.DataFrame({
-        'price': prices['price'],
-        'time': pd.to_datetime(prices['time'], unit='ms')
-    })
-    df.set_index('time', inplace=True)
-    df['returns'] = df['price'].pct_change()
-    df['ewm_std'] = df['returns'].ewm(span=14, adjust=False).std()
-    ema_stability = 1 - (df['ewm_std'].iloc[-1] / df['ewm_std'].max())  # closer to 1 = stable trend
+    # Ensure prices arrays exist and have enough length
+    price_series = pd.Series(prices.get('price', []))
+    time_series  = pd.Series(prices.get('time', []))
+    n = len(price_series)
 
-    # Combine Signals
-    # ATR increases distance when volatility is high
-    # Wave increases distance during strong movements
-    # EMA stability reduces distance during smooth trends
-    adaptive_scaler = 1.0 + (atr_mult * 0.5) + (wave_strength * 0.3) - (ema_stability * 0.2)
+    # Fallback: if not enough history, return safe fixed distance
+    if n < MIN_HISTORY:
+        if debug: defs.announce("Debug: Insufficient history, falling back to fixed")
+        return distance_fixed(active_order)
 
-    # Compute the adaptive trigger distance
-    adaptive_distance = active_order['distance'] * adaptive_scaler
+    # --- 1) Volatility estimates ---
+    # 1a. ATR-like (True Range) using simple price diffs (since candles may not be provided)
+    # Use percent ATR (so it's comparable to distance %)
+    returns = price_series.pct_change().dropna()
+    if len(returns) < 2:
+        vol_pct = 0.0
+    else:
+        # EWMA volatility (gives more weight to recent moves)
+        span_vol = max(10, min(60, int(config.best_vol_ewma_span)))
+        ewma_var = returns.ewm(span=span_vol, adjust=False).var().iloc[-1]
+        vol_pct = (np.sqrt(ewma_var) * 100) if (not np.isnan(ewma_var)) else returns.std() * 100
 
-    # Ensure minimum distance
-    if adaptive_distance < active_order['distance']:
-        adaptive_distance = active_order['distance']
+    # 1b. Simple recent range (high-low proxy from recent window)
+    window = min(50, n)
+    recent = price_series.iloc[-window:]
+    recent_range_pct = ((recent.max() - recent.min()) / recent.min()) * 100 if recent.min() > 0 else 0.0
 
-    # Adjust active_order
-    active_order['wave']        = wave_strength
-    active_order['fluctuation'] = adaptive_distance
-    
-    # Prevent sell at loss and other issues    
-    active_order = protect_respect(active_order, price_distance)
+    # Combine vol measures (clamped)
+    volatility = max(vol_pct, recent_range_pct * 0.5)
+    volatility = max(volatility, 0.0)  # clamp
+    # Normalize volatility to 0..1 (configurable scaling)
+    vol_norm = min(volatility / max(1.0, config.best_vol_scale), 1.0)
+
+    # --- 2) Trend & momentum ---
+    # EMA of returns for trend direction/strength
+    trend_span = max(5, min(40, int(config.best_trend_ema_span)))
+    ema_ret = returns.ewm(span=trend_span, adjust=False).mean().iloc[-1]
+    # trend_strength expressed as percentage magnitude
+    trend_strength = abs(ema_ret) * 100
+    trend_dir = 1 if ema_ret > 0 else -1 if ema_ret < 0 else 0
+    trend_norm = min(trend_strength / max(0.01, config.best_trend_scale), 1.0)
+
+    # --- 3) Candidate distances (absolute % values) ---
+    # Use your existing functions to get candidate distances (we'll take absolute magnitudes for combination)
+    # Make copies so they don't mutate original
+    try:
+        fixed_cand = distance_fixed(active_order.copy())['fluctuation']
+        spot_cand  = distance_spot(active_order.copy(), price_distance)['fluctuation']
+        wave_cand  = distance_wave(active_order.copy(), prices, price_distance, prevent=False)['fluctuation']
+    except Exception:
+        # If something fails, fallback to safe fixed distance
+        if debug: defs.announce("Debug: candidate calc failed, falling back fixed")
+        return distance_fixed(active_order)
+
+    # Convert to positive magnitude to combine — keep sign handling to protect() later
+    fixed_mag = abs(float(fixed_cand))
+    spot_mag  = abs(float(spot_cand))
+    wave_mag  = abs(float(wave_cand))
+
+    # --- 4) Adaptive weighting logic ---
+    # Base weights (configurable)
+    w_fixed_base = config.best_w_fixed
+    w_wave_base  = config.best_w_wave
+    w_spot_base  = config.best_w_spot
+
+    # Modulate weights:
+    # - When volatility is high, prefer wave+fixed (wider stops)
+    # - When trend is strong, increase spot weight (tighter if trend supports)
+    weight_spot = w_spot_base + (trend_norm * 0.5) * (1 - vol_norm)  # trend helps spot, but not if very volatile
+    weight_wave = w_wave_base + (vol_norm * 0.4)
+    weight_fixed = w_fixed_base + (vol_norm * 0.2)
+
+    # Normalize weights
+    total_w = weight_fixed + weight_wave + weight_spot
+    if total_w <= 0:
+        weight_fixed, weight_wave, weight_spot = 0.33, 0.33, 0.34
+    else:
+        weight_fixed /= total_w
+        weight_wave  /= total_w
+        weight_spot  /= total_w
+
+    # Compute adaptive magnitude (weighted)
+    adaptive_mag = (fixed_mag * weight_fixed) + (wave_mag * weight_wave) + (spot_mag * weight_spot)
+
+    # --- 5) Profit-aware caps and dynamic multipliers ---
+    # If active position is already profitable, allow tighter trailing (reduce distance), else be conservative
+    current_profit = price_distance  # already in percent (positive or negative depending on side handling)
+    # For Sell side, price_distance positive means price went up since start -> profitable for Sell? Keep logic consistent with protect()
+    profit_factor = 1.0
+    if active_order.get('side') == "Sell":
+        if current_profit > 0:
+            profit_factor = max(0.6, 1.0 - min(0.6, current_profit / 10.0))  # the more profit, the more we can tighten
+    else:  # Buy side
+        if current_profit < 0:
+            # for buys, negative price_distance -> price dropped vs start (profit for buy only when price is below start?), be conservative
+            profit_factor = 1.0
+
+    adaptive_mag *= profit_factor
+
+    # Limiters: don't go below default distance, don't exceed a safe maximum multiplier
+    #min_allowed = float(active_order.get('distance', 0.0))
+    min_allowed = 0
+    max_multiplier = float(config.best_max_multiplier)
+    adaptive_mag = max(adaptive_mag, min_allowed)
+    adaptive_mag = min(adaptive_mag, min_allowed * max_multiplier)
+
+    # --- 6) Hysteresis & smoothing to avoid rapid toggles ---
+    # Hysteresis threshold (percent change required to actually update)
+    start_fluc = float(active_order.get('fluctuation', min_allowed))
+    hysteresis_pct = float(config.best_hysteresis_pct)  # 5% relative change required
+    # Compute relative change
+    if start_fluc <= 0:
+        rel_change = float('inf')
+    else:
+        rel_change = abs(adaptive_mag - start_fluc) / start_fluc
+
+    # Time-based smoothing: more recent updates allow slightly more rapid change
+    # Use EWMA smoothing factor that itself adapts: higher volatility -> slower smoothing
+    base_smooth = float(config.best_smoothing_alpha)
+    adaptive_alpha = base_smooth * (1.0 - vol_norm * 0.6)   # if vol high, reduce alpha (slower changes)
+    adaptive_alpha = min(max(adaptive_alpha, 0.05), 0.9)
+
+    # If change is small (below hysteresis) keep previous (smaller CPU churn)
+    if rel_change < hysteresis_pct:
+        # but still apply light EWMA to slowly nudge towards adaptive_mag
+        new_fluc = (start_fluc * (1 - adaptive_alpha)) + (adaptive_mag * adaptive_alpha)
+    else:
+        # large change -> respond quicker but cap how much we can change in single update
+        max_step = float(config.best_max_step_pct)  # max relative step per update
+        max_step = max_step if max_step > 0 else 0.5
+        allowed = start_fluc * (1 + max_step)
+        lower_allowed = start_fluc * (1 - max_step)
+        proposed = (start_fluc * (1 - adaptive_alpha)) + (adaptive_mag * adaptive_alpha)
+        # clamp
+        new_fluc = min(max(proposed, lower_allowed), allowed)
+
+    # --- 7) Direction handling & protect ---
+    # The rest of your system expects 'fluctuation' to have sign depending on side (your protect() handles it).
+    # We'll set positive magnitude here; protect() will enforce final sign and minimums.
+    active_order['wave'] = float(new_fluc)
+
+    # Call protect to enforce business rules (minimums, wave_peaks, profitable zone caps)
+    active_order = protect(active_order, price_distance)
+
+    # Final safety assignment
+    final = active_order.get('fluctuation', 0.0)
+
+    # --- Debugging output ---
+    if debug:
+        defs.announce("Debug: ChatGPT data")
+        print(f"volatility (pct): {volatility:.4f}")
+        print(f"vol_norm        : {vol_norm:.4f}")
+        print(f"trend_strength  : {trend_strength:.4f}")
+        print(f"trend_norm      : {trend_norm:.4f}, dir {trend_dir}")
+        print(f"fixed_mag       : {fixed_mag:.4f}")
+        print(f"wave_mag        : {wave_mag:.4f}")
+        print(f"spot_mag        : {spot_mag:.4f}")
+        print(f"weights         : fixed={weight_fixed:.3f}, wave={weight_wave:.3f}, spot={weight_spot:.3f}")
+        print(f"adaptive_mag    : {adaptive_mag:.4f}")
+        print(f"start_fluc       : {start_fluc:.4f}, new_fluc {new_fluc:.4f}")
+        print(f"final_fluc      : {final:.4f}")
 
     # Return active_order
-    return active_order
-
-# Smart trigger distance calculator combining ATR, Wave, and EMA stability with adaptive regime detection (trending vs. ranging)
-def distance_smart(active_order, prices, price_distance):
-
-    # === 1. Get ATR data ===
-    atr_percentage, atr_avg, atr_mult = calculate_atr()
-
-    # === 2. Wave detection (short-term momentum) ===
-    wave_order    = distance_wave(active_order.copy(), prices, price_distance, prevent=False)
-    wave_strength = abs(wave_order['wave'])  # magnitude of short-term movement
-
-    # === 3. EMA-based trend stability ===
-    df = pd.DataFrame({
-        'price': prices['price'],
-        'time': pd.to_datetime(prices['time'], unit='ms')
-    })
-    df.set_index('time', inplace=True)
-    df['returns'] = df['price'].pct_change()
-    df['ema'] = df['price'].ewm(span=14, adjust=False).mean()
-    df['ema_slope'] = df['ema'].diff()
-
-    # EMA volatility and slope metrics
-    df['ewm_std'] = df['returns'].ewm(span=14, adjust=False).std()
-    ema_stability = 1 - (df['ewm_std'].iloc[-1] / df['ewm_std'].max())  # 1=stable, 0=chaotic
-    ema_slope = df['ema_slope'].iloc[-1] / df['ema'].iloc[-1] if df['ema'].iloc[-1] != 0 else 0
-
-    # === 4. Regime Detection ===
-    # If volatility and slope are both high → trending
-    # If volatility is high but slope is flat → ranging
-    trend_strength = abs(ema_slope) * 1000  # normalized slope in %
-    vol_ratio = atr_percentage / max(atr_avg, 1e-9)  # volatility relative to baseline
-
-    if trend_strength > 0.05 and vol_ratio > 1.1:
-        regime = "Trending"
-    elif vol_ratio > 1.2 and trend_strength < 0.03:
-        regime = "Ranging"
-    else:
-        regime = "Calm"
-
-    # === 5. Adaptive weighting based on regime ===
-    if regime == "Trending":
-        w_atr, w_wave, w_stab = 0.4, 0.4, 0.2
-    elif regime == "Ranging":
-        w_atr, w_wave, w_stab = 0.5, 0.2, 0.3
-    else:  # Calm
-        w_atr, w_wave, w_stab = 0.3, 0.2, 0.5
-
-    # === 6. Composite adaptive multiplier ===
-    adaptive_mult = (
-        (atr_mult * w_atr) +            # volatility component
-        (wave_strength * w_wave) +      # recent momentum component
-        ((1 - ema_stability) * w_stab)  # trend stability inverse (more chaos → more distance)
-    )
-
-    # === 7. Final distance computation ===
-    base_distance = active_order['distance']
-    adaptive_distance = base_distance * (1 + adaptive_mult)
-
-    # Enforce reasonable limits
-    adaptive_distance = max(base_distance * 0.8, min(adaptive_distance, base_distance * 3))
-
-    # === 8. Assign results ===
-    active_order['wave']        = wave_strength
-    active_order['fluctuation'] = adaptive_distance
-    active_order['regime']      = regime
-    
-    # === 9. Apply protection logic ===
-    active_order = protect_respect(active_order, price_distance)
-
-    # === 10. Optional debug ===
-    defs.announce(f"[{regime}] distance={adaptive_distance:.4f}% | ATRx={atr_mult:.2f} | Wave={wave_strength:.2f} | Stability={ema_stability:.2f}")
-
     return active_order
 
 # Calculate trigger price distance
@@ -528,18 +497,10 @@ def calculate(active_order, prices):
     if active_order['wiggle'] == "EMA":
         active_order = distance_ema(active_order, prices, price_distance)
 
-    ''' Use HYBRID to set distance '''
-    if active_order['wiggle'] == "Hybrid":
-        active_order = distance_hybrid(active_order, prices, price_distance)
-
-    ''' Use ADAPATIVE to set distance '''
-    if active_order['wiggle'] == "Adaptive":
-        active_order = distance_adaptive(active_order, prices, price_distance)
-
-    ''' Use SMART to set distance '''
-    if active_order['wiggle'] == "Smart":
-        active_order = distance_smart(active_order, prices, price_distance)
-
+    ''' Use CHATGPT (adaptive) to dynamically combine Fixed, Spot, and Wave '''
+    if active_order['wiggle'] == "ChatGPT":
+        active_order = distance_chatgpt(active_order, prices, price_distance)
+       
     # Report to stdout
     if previous_fluctuation != active_order['fluctuation']:
         defs.announce(f"Adviced trigger price distance is now {active_order['fluctuation']:.4f} %")

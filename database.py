@@ -33,7 +33,7 @@ def save(all_buys, info):
     result = order_count(all_buys, info)
     count  = result[0]
     total  = result[1]
-    defs.announce(f"Database contains {count} buy orders and {total} {info['baseCoin']} was bought")
+    defs.announce(f"Database contains {count} buy orders and {defs.format_number(total, info['basePrecision'])} {info['baseCoin']} was bought")
 
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))

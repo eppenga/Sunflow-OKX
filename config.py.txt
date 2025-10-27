@@ -11,10 +11,11 @@ multiplier              = 1.00         # Multiply minimum order quantity by this
 spike_margin            = 1.00         # Margin in percent to prevent false spike detection in orders
 
 # Wave
-wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot, Wave, ATR, EMA or Hybrid
-wave_start              = False        # Use default distance (please see below, True) or start of using market data (False)
+wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot or Wave
+wave_minimum            = False        # Minimum distance can't drop below default distance
+wave_peaks              = False        # Overrides wave_minimum when price distance is above default distance
 wave_distance           = 0.080        # Trigger price distance percentage when Fixed is used by wiggle
-wave_timeframe          = 5000         # Timeframe in ms to measure wave length, used when wiggle uses Wave, EMA or Hybrid
+wave_timeframe          = 5000         # Timeframe in ms to measure wave length, used when wiggle uses Wave
 wave_multiplier         = 1.00         # Multiply wave percentage by this multiplier
 
 # Prices
@@ -131,7 +132,6 @@ database_rebalance      = True                                       # Sync the 
 rebalance_margin        = 1                                          # Allowed deviation in percentage between the above
 equity_check            = True                                       # Check if we have enough base assets free to be able to buy
 equity_multiplier       = 5                                          # The above is based on the buy base multiplied by this
-protect_peaks           = True                                       # Slow down distance to minimum
 quick_check             = True                                       # Quick check orders on startup
 func_show_delay         = False                                      # When set to True, delay messages are always shown
 func_norm_delay         = 2500                                       # Show message when execution of a function is greater in ms

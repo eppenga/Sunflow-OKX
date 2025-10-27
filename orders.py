@@ -189,8 +189,8 @@ def merge_order_fills(order, fills, info):
     order['cumExecFeeCcy'] = fills['cumExecFeeCcy']
     
     # Round numbers
-    order['cumExecQty']   = defs.round_number(fills['cumExecQty'], info['basePrecision'], "down")
-    order['cumExecValue'] = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")
+    order['cumExecQty']    = defs.round_number(fills['cumExecQty'], info['basePrecision'], "down")
+    order['cumExecValue']  = defs.round_number(fills['cumExecValue'], info['quotePrecision'], "down")
     
     # Debug to stdout
     if debug:
