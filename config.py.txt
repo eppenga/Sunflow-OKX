@@ -11,7 +11,7 @@ multiplier              = 1.00         # Multiply minimum order quantity by this
 spike_margin            = 1.00         # Margin in percent to prevent false spike detection in orders
 
 # Wave
-wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot or Wave
+wave_wiggle             = "Wave"       # Method for trigger price distance, Fixed, Spot, Wave, EMA, ATR or ChatGPT
 wave_minimum            = False        # Minimum distance can't drop below default distance
 wave_peaks              = False        # Overrides wave_minimum when price distance is above default distance
 wave_distance           = 0.080        # Trigger price distance percentage when Fixed is used by wiggle
@@ -139,3 +139,15 @@ func_warn_delay         = 5000                                       # Show warn
 uptime_delay            = 10000                                      # Show uptime ping message if no ticker is received
 uptime_expire           = 10000000                                   # Maximum time between tickers before Sunflow will exit
 stuck_interval          = 30000                                      # If exchange returns no order data, do an additional check
+# ChatGPT wave trend settings
+chatgpt_vol_ewma_span   = 20                                         # Lookback (in samples) for EWMA variance of returns
+chatgpt_trend_ema_span  = 12                                         # Lookback (in samples) for EMA of returns (trend detector)
+chatgpt_vol_scale       = 3.0                                        # Scales raw volatility into a 0..1 "vol_norm"
+chatgpt_trend_scale     = 1.0                                        # Scales trend strength into 0..1 "trend_norm"
+chatgpt_w_fixed         = 0.35                                       # Baseline weight for Fixed candidate distance (stability anchor)
+chatgpt_w_wave          = 0.35                                       # Baseline weight for Wave candidate (price-change over timeframe)
+chatgpt_w_spot          = 0.30                                       # Baseline weight for Spot candidate (tightens distance with favorable move)
+chatgpt_max_multiplier  = 5.0                                        # Cap on how much the adaptive distance may exceed the (implicit) minimum
+chatgpt_hysteresis_pct  = 0.05                                       # Minimum relative change (5%) required before committing an update
+chatgpt_smoothing_alpha = 0.35                                       # EWMA blend factor when moving toward a new target distance
+chatgpt_max_step_pct    = 0.5                                        # Max single-update step (relative) allowed when change is large

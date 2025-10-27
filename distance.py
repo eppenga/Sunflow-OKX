@@ -313,7 +313,7 @@ def distance_chatgpt(active_order, prices, price_distance):
         vol_pct = 0.0
     else:
         # EWMA volatility (gives more weight to recent moves)
-        span_vol = max(10, min(60, int(config.best_vol_ewma_span)))
+        span_vol = max(10, min(60, int(config.chatgpt_vol_ewma_span)))
         ewma_var = returns.ewm(span=span_vol, adjust=False).var().iloc[-1]
         vol_pct = (np.sqrt(ewma_var) * 100) if (not np.isnan(ewma_var)) else returns.std() * 100
 
@@ -326,16 +326,16 @@ def distance_chatgpt(active_order, prices, price_distance):
     volatility = max(vol_pct, recent_range_pct * 0.5)
     volatility = max(volatility, 0.0)  # clamp
     # Normalize volatility to 0..1 (configurable scaling)
-    vol_norm = min(volatility / max(1.0, config.best_vol_scale), 1.0)
+    vol_norm = min(volatility / max(1.0, config.chatgpt_vol_scale), 1.0)
 
     # --- 2) Trend & momentum ---
     # EMA of returns for trend direction/strength
-    trend_span = max(5, min(40, int(config.best_trend_ema_span)))
+    trend_span = max(5, min(40, int(config.chatgpt_trend_ema_span)))
     ema_ret = returns.ewm(span=trend_span, adjust=False).mean().iloc[-1]
     # trend_strength expressed as percentage magnitude
     trend_strength = abs(ema_ret) * 100
     trend_dir = 1 if ema_ret > 0 else -1 if ema_ret < 0 else 0
-    trend_norm = min(trend_strength / max(0.01, config.best_trend_scale), 1.0)
+    trend_norm = min(trend_strength / max(0.01, config.chatgpt_trend_scale), 1.0)
 
     # --- 3) Candidate distances (absolute % values) ---
     # Use your existing functions to get candidate distances (we'll take absolute magnitudes for combination)
@@ -356,9 +356,9 @@ def distance_chatgpt(active_order, prices, price_distance):
 
     # --- 4) Adaptive weighting logic ---
     # Base weights (configurable)
-    w_fixed_base = config.best_w_fixed
-    w_wave_base  = config.best_w_wave
-    w_spot_base  = config.best_w_spot
+    w_fixed_base = config.chatgpt_w_fixed
+    w_wave_base  = config.chatgpt_w_wave
+    w_spot_base  = config.chatgpt_w_spot
 
     # Modulate weights:
     # - When volatility is high, prefer wave+fixed (wider stops)
@@ -397,14 +397,14 @@ def distance_chatgpt(active_order, prices, price_distance):
     # Limiters: don't go below default distance, don't exceed a safe maximum multiplier
     #min_allowed = float(active_order.get('distance', 0.0))
     min_allowed = 0
-    max_multiplier = float(config.best_max_multiplier)
+    max_multiplier = float(config.chatgpt_max_multiplier)
     adaptive_mag = max(adaptive_mag, min_allowed)
     adaptive_mag = min(adaptive_mag, min_allowed * max_multiplier)
 
     # --- 6) Hysteresis & smoothing to avoid rapid toggles ---
     # Hysteresis threshold (percent change required to actually update)
     start_fluc = float(active_order.get('fluctuation', min_allowed))
-    hysteresis_pct = float(config.best_hysteresis_pct)  # 5% relative change required
+    hysteresis_pct = float(config.chatgpt_hysteresis_pct)  # 5% relative change required
     # Compute relative change
     if start_fluc <= 0:
         rel_change = float('inf')
@@ -413,7 +413,7 @@ def distance_chatgpt(active_order, prices, price_distance):
 
     # Time-based smoothing: more recent updates allow slightly more rapid change
     # Use EWMA smoothing factor that itself adapts: higher volatility -> slower smoothing
-    base_smooth = float(config.best_smoothing_alpha)
+    base_smooth = float(config.chatgpt_smoothing_alpha)
     adaptive_alpha = base_smooth * (1.0 - vol_norm * 0.6)   # if vol high, reduce alpha (slower changes)
     adaptive_alpha = min(max(adaptive_alpha, 0.05), 0.9)
 
@@ -423,7 +423,7 @@ def distance_chatgpt(active_order, prices, price_distance):
         new_fluc = (start_fluc * (1 - adaptive_alpha)) + (adaptive_mag * adaptive_alpha)
     else:
         # large change -> respond quicker but cap how much we can change in single update
-        max_step = float(config.best_max_step_pct)  # max relative step per update
+        max_step = float(config.chatgpt_max_step_pct)  # max relative step per update
         max_step = max_step if max_step > 0 else 0.5
         allowed = start_fluc * (1 + max_step)
         lower_allowed = start_fluc * (1 - max_step)
