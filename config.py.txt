@@ -139,6 +139,7 @@ func_warn_delay         = 5000                                       # Show warn
 uptime_delay            = 10000                                      # Show uptime ping message if no ticker is received
 uptime_expire           = 10000000                                   # Maximum time between tickers before Sunflow will exit
 stuck_interval          = 30000                                      # If exchange returns no order data, do an additional check
+
 # ChatGPT wave trend settings
 chatgpt_vol_ewma_span   = 20                                         # Lookback (in samples) for EWMA variance of returns
 chatgpt_trend_ema_span  = 12                                         # Lookback (in samples) for EMA of returns (trend detector)

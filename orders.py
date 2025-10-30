@@ -381,13 +381,15 @@ def buy(spot, compounding, active_order, all_buys, prices, info):
     info = preload.calc_info(info, spot, config.multiplier, compounding)
 
     # Initialize active_order
-    active_order['side']     = "Buy"
-    active_order['active']   = True
-    active_order['start']    = spot
-    active_order['previous'] = spot
-    active_order['current']  = spot
-    active_order['created']  = defs.now_utc()[4]
-    active_order['orderid']  = ""
+    active_order['side']        = "Buy"
+    active_order['active']      = True
+    active_order['start']       = spot
+    active_order['previous']    = spot
+    active_order['current']     = spot
+    active_order['created']     = defs.now_utc()[4]
+    active_order['orderid']     = ""
+    active_order['fluctuation'] = active_order['distance']
+    active_order['last']        = active_order['distance']
     
     # Determine distance of trigger price
     active_order = distance.calculate(active_order, prices)
@@ -486,14 +488,16 @@ def sell(spot, active_order, prices, info):
     defs.announce("*** SELL SELL SELL! ***")
 
     # Initialize active_order
-    active_order['side']     = "Sell"
-    active_order['active']   = True
-    active_order['start']    = spot
-    active_order['previous'] = spot
-    active_order['current']  = spot
-    active_order['created']  = defs.now_utc()[4]
-    active_order['orderid']  = ""
-  
+    active_order['side']        = "Sell"
+    active_order['active']      = True
+    active_order['start']       = spot
+    active_order['previous']    = spot
+    active_order['current']     = spot
+    active_order['created']     = defs.now_utc()[4]
+    active_order['orderid']     = ""
+    active_order['fluctuation'] = active_order['distance']
+    active_order['last']        = active_order['distance']
+
     # Determine distance of trigger price
     active_order = distance.calculate(active_order, prices)
 

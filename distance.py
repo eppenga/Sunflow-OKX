@@ -277,189 +277,6 @@ def distance_atr(active_order, prices, price_distance):
     # Return active_order
     return active_order
 
-# Advanced adaptive distance calculation designed by ChatGPT :)
-def distance_chatgpt(active_order, prices, price_distance):
-    """
-    Highly adaptive trigger distance:
-      - Uses ATR (or percent stddev) as volatility baseline
-      - Uses EWMA of returns to detect trend strength and direction
-      - Computes candidate distances from Fixed/Spot/Wave
-      - Dynamically weights candidates based on volatility & trend
-      - Adds hysteresis and time-aware smoothing to prevent whipsaw
-      - Caps/flattens distances with profit-aware limits and config knobs
-    """
-
-    # Debug toggle
-    debug = True
-
-    now_ms = defs.now_utc()[4]  # existing helper returns time, index 4 is millis in your codebase
-    MIN_HISTORY = 20  # minimal price points to compute meaningful stats
-
-    # Ensure prices arrays exist and have enough length
-    price_series = pd.Series(prices.get('price', []))
-    time_series  = pd.Series(prices.get('time', []))
-    n = len(price_series)
-
-    # Fallback: if not enough history, return safe fixed distance
-    if n < MIN_HISTORY:
-        if debug: defs.announce("Debug: Insufficient history, falling back to fixed")
-        return distance_fixed(active_order)
-
-    # --- 1) Volatility estimates ---
-    # 1a. ATR-like (True Range) using simple price diffs (since candles may not be provided)
-    # Use percent ATR (so it's comparable to distance %)
-    returns = price_series.pct_change().dropna()
-    if len(returns) < 2:
-        vol_pct = 0.0
-    else:
-        # EWMA volatility (gives more weight to recent moves)
-        span_vol = max(10, min(60, int(config.chatgpt_vol_ewma_span)))
-        ewma_var = returns.ewm(span=span_vol, adjust=False).var().iloc[-1]
-        vol_pct = (np.sqrt(ewma_var) * 100) if (not np.isnan(ewma_var)) else returns.std() * 100
-
-    # 1b. Simple recent range (high-low proxy from recent window)
-    window = min(50, n)
-    recent = price_series.iloc[-window:]
-    recent_range_pct = ((recent.max() - recent.min()) / recent.min()) * 100 if recent.min() > 0 else 0.0
-
-    # Combine vol measures (clamped)
-    volatility = max(vol_pct, recent_range_pct * 0.5)
-    volatility = max(volatility, 0.0)  # clamp
-    # Normalize volatility to 0..1 (configurable scaling)
-    vol_norm = min(volatility / max(1.0, config.chatgpt_vol_scale), 1.0)
-
-    # --- 2) Trend & momentum ---
-    # EMA of returns for trend direction/strength
-    trend_span = max(5, min(40, int(config.chatgpt_trend_ema_span)))
-    ema_ret = returns.ewm(span=trend_span, adjust=False).mean().iloc[-1]
-    # trend_strength expressed as percentage magnitude
-    trend_strength = abs(ema_ret) * 100
-    trend_dir = 1 if ema_ret > 0 else -1 if ema_ret < 0 else 0
-    trend_norm = min(trend_strength / max(0.01, config.chatgpt_trend_scale), 1.0)
-
-    # --- 3) Candidate distances (absolute % values) ---
-    # Use your existing functions to get candidate distances (we'll take absolute magnitudes for combination)
-    # Make copies so they don't mutate original
-    try:
-        fixed_cand = distance_fixed(active_order.copy())['fluctuation']
-        spot_cand  = distance_spot(active_order.copy(), price_distance)['fluctuation']
-        wave_cand  = distance_wave(active_order.copy(), prices, price_distance, prevent=False)['fluctuation']
-    except Exception:
-        # If something fails, fallback to safe fixed distance
-        if debug: defs.announce("Debug: candidate calc failed, falling back fixed")
-        return distance_fixed(active_order)
-
-    # Convert to positive magnitude to combine — keep sign handling to protect() later
-    fixed_mag = abs(float(fixed_cand))
-    spot_mag  = abs(float(spot_cand))
-    wave_mag  = abs(float(wave_cand))
-
-    # --- 4) Adaptive weighting logic ---
-    # Base weights (configurable)
-    w_fixed_base = config.chatgpt_w_fixed
-    w_wave_base  = config.chatgpt_w_wave
-    w_spot_base  = config.chatgpt_w_spot
-
-    # Modulate weights:
-    # - When volatility is high, prefer wave+fixed (wider stops)
-    # - When trend is strong, increase spot weight (tighter if trend supports)
-    weight_spot = w_spot_base + (trend_norm * 0.5) * (1 - vol_norm)  # trend helps spot, but not if very volatile
-    weight_wave = w_wave_base + (vol_norm * 0.4)
-    weight_fixed = w_fixed_base + (vol_norm * 0.2)
-
-    # Normalize weights
-    total_w = weight_fixed + weight_wave + weight_spot
-    if total_w <= 0:
-        weight_fixed, weight_wave, weight_spot = 0.33, 0.33, 0.34
-    else:
-        weight_fixed /= total_w
-        weight_wave  /= total_w
-        weight_spot  /= total_w
-
-    # Compute adaptive magnitude (weighted)
-    adaptive_mag = (fixed_mag * weight_fixed) + (wave_mag * weight_wave) + (spot_mag * weight_spot)
-
-    # --- 5) Profit-aware caps and dynamic multipliers ---
-    # If active position is already profitable, allow tighter trailing (reduce distance), else be conservative
-    current_profit = price_distance  # already in percent (positive or negative depending on side handling)
-    # For Sell side, price_distance positive means price went up since start -> profitable for Sell? Keep logic consistent with protect()
-    profit_factor = 1.0
-    if active_order.get('side') == "Sell":
-        if current_profit > 0:
-            profit_factor = max(0.6, 1.0 - min(0.6, current_profit / 10.0))  # the more profit, the more we can tighten
-    else:  # Buy side
-        if current_profit < 0:
-            # for buys, negative price_distance -> price dropped vs start (profit for buy only when price is below start?), be conservative
-            profit_factor = 1.0
-
-    adaptive_mag *= profit_factor
-
-    # Limiters: don't go below default distance, don't exceed a safe maximum multiplier
-    #min_allowed = float(active_order.get('distance', 0.0))
-    min_allowed = 0
-    max_multiplier = float(config.chatgpt_max_multiplier)
-    adaptive_mag = max(adaptive_mag, min_allowed)
-    adaptive_mag = min(adaptive_mag, min_allowed * max_multiplier)
-
-    # --- 6) Hysteresis & smoothing to avoid rapid toggles ---
-    # Hysteresis threshold (percent change required to actually update)
-    start_fluc = float(active_order.get('fluctuation', min_allowed))
-    hysteresis_pct = float(config.chatgpt_hysteresis_pct)  # 5% relative change required
-    # Compute relative change
-    if start_fluc <= 0:
-        rel_change = float('inf')
-    else:
-        rel_change = abs(adaptive_mag - start_fluc) / start_fluc
-
-    # Time-based smoothing: more recent updates allow slightly more rapid change
-    # Use EWMA smoothing factor that itself adapts: higher volatility -> slower smoothing
-    base_smooth = float(config.chatgpt_smoothing_alpha)
-    adaptive_alpha = base_smooth * (1.0 - vol_norm * 0.6)   # if vol high, reduce alpha (slower changes)
-    adaptive_alpha = min(max(adaptive_alpha, 0.05), 0.9)
-
-    # If change is small (below hysteresis) keep previous (smaller CPU churn)
-    if rel_change < hysteresis_pct:
-        # but still apply light EWMA to slowly nudge towards adaptive_mag
-        new_fluc = (start_fluc * (1 - adaptive_alpha)) + (adaptive_mag * adaptive_alpha)
-    else:
-        # large change -> respond quicker but cap how much we can change in single update
-        max_step = float(config.chatgpt_max_step_pct)  # max relative step per update
-        max_step = max_step if max_step > 0 else 0.5
-        allowed = start_fluc * (1 + max_step)
-        lower_allowed = start_fluc * (1 - max_step)
-        proposed = (start_fluc * (1 - adaptive_alpha)) + (adaptive_mag * adaptive_alpha)
-        # clamp
-        new_fluc = min(max(proposed, lower_allowed), allowed)
-
-    # --- 7) Direction handling & protect ---
-    # The rest of your system expects 'fluctuation' to have sign depending on side (your protect() handles it).
-    # We'll set positive magnitude here; protect() will enforce final sign and minimums.
-    active_order['wave'] = float(new_fluc)
-
-    # Call protect to enforce business rules (minimums, wave_peaks, profitable zone caps)
-    active_order = protect(active_order, price_distance)
-
-    # Final safety assignment
-    final = active_order.get('fluctuation', 0.0)
-
-    # --- Debugging output ---
-    if debug:
-        defs.announce("Debug: ChatGPT data")
-        print(f"volatility (pct): {volatility:.4f}")
-        print(f"vol_norm        : {vol_norm:.4f}")
-        print(f"trend_strength  : {trend_strength:.4f}")
-        print(f"trend_norm      : {trend_norm:.4f}, dir {trend_dir}")
-        print(f"fixed_mag       : {fixed_mag:.4f}")
-        print(f"wave_mag        : {wave_mag:.4f}")
-        print(f"spot_mag        : {spot_mag:.4f}")
-        print(f"weights         : fixed={weight_fixed:.3f}, wave={weight_wave:.3f}, spot={weight_spot:.3f}")
-        print(f"adaptive_mag    : {adaptive_mag:.4f}")
-        print(f"start_fluc       : {start_fluc:.4f}, new_fluc {new_fluc:.4f}")
-        print(f"final_fluc      : {final:.4f}")
-
-    # Return active_order
-    return active_order
-
 # Calculate trigger price distance
 def calculate(active_order, prices):
 
@@ -468,8 +285,8 @@ def calculate(active_order, prices):
     speed = True
     stime = defs.now_utc()[4]
 
-    # Store previous fluctuation
-    previous_fluctuation = active_order['fluctuation']
+    # Store previous fluctuation to be able to announce
+    active_order['last'] = active_order['fluctuation']
     
     # By default fluctuation equals distance
     active_order['fluctuation'] = active_order['distance']
@@ -497,12 +314,8 @@ def calculate(active_order, prices):
     if active_order['wiggle'] == "EMA":
         active_order = distance_ema(active_order, prices, price_distance)
 
-    ''' Use CHATGPT (adaptive) to dynamically combine Fixed, Spot, and Wave '''
-    if active_order['wiggle'] == "ChatGPT":
-        active_order = distance_chatgpt(active_order, prices, price_distance)
-       
     # Report to stdout
-    if previous_fluctuation != active_order['fluctuation']:
+    if active_order['last'] != active_order['fluctuation']:
         defs.announce(f"Adviced trigger price distance is now {active_order['fluctuation']:.4f} %")
 
     # Report execution time

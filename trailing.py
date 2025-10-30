@@ -552,8 +552,9 @@ def adjust_tp(active_order, all_buys, all_sells, compounding, spot, info):
         active_order['trigger'] = active_order['trigger_new']
         active_order['updated'] = defs.now_utc()[4]
 
-    elif error_code in (51278, 51527):
+    elif error_code in (51278, 51527, 51280):
     
+        # 51280 - SL trigger price cannot be higher than the last price (Price rose to quickly and then probably dropped down)
         # 51278 - SL trigger price cannot be lower than the last price (Price dropped to quickly and then probably shot back up)
         # 51527 - Order modification failed. At least 1 of the attached TP/SL orders does not exist (Order probably got filled in between)
         go_check = True
