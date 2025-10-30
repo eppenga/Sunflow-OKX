@@ -89,8 +89,14 @@ def remove(active_order, all_buys, info):
     if debug:
         defs.announce(f"Debug: About to remove {active_order['side']} order {active_order['orderid']}")
     
-    # Reset active_order
+    # Reset active_order always
     active_order['active'] = False
+    
+    # Check if order ID exists
+    if not active_order['orderid']:
+        error_code = "-1"
+        error_msg  = "No order ID found"
+        return active_order, all_buys, error_code, error_msg
     
     # Remove order from exchange, error handling is happening in next functions
     result     = orders.cancel_order(active_order['orderid'])

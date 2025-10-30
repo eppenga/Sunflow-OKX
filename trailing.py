@@ -90,6 +90,15 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
             message = f"*** Warning: Failed to get trailing order {active_order['orderid']} ***\n>>> Message: {error_code} - {error_msg}"
             defs.log_error(message)
             
+            # Remove order            
+            result       = database.remove(active_order, all_buys, info)
+            active_order = result[0]
+            all_buys     = result[1]
+            error_code   = result[2]
+            error_msg    = result[3]           
+            if error_code != 0:
+                message = f"*** Warning: Failed to remove trailing order '{active_order['orderid']}' ! ***\n>>> Message: {error_code} - {error_msg}"
+                defs.log_error(message)
 
         #########################################################################################################
         # Check if trailing order is filled (effective at OKX), if so reset counters and close trailing process #
