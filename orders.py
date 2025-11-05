@@ -318,6 +318,61 @@ def check_sell(spot, profit, active_order, all_buys, use_pricelimit, pricelimit_
     # Return data
     return all_sells, qty, can_sell, rise_to
         
+# Do we need to buy to pay fees
+def check_buy_fees(info):
+
+    # Debug and speed
+    debug = False
+    speed = True
+    stime = defs.now_utc()[4]
+    
+    # Initialize variables
+    result     = ()
+    error_code = 0
+    error_msg  = ""
+    required   = info['buyBase'] * 0.5
+    
+    # Report to stdout
+    defs.announce(f"Checking if we have enough funds for fees")
+    
+    # Get balances
+    result     = get_balance(info['baseCoin'])
+    balances   = result[0]
+    error_code = result[1]
+    error_msg  = result[2]
+   
+    # Debug
+    if debug:
+        print(f"Base assets equity    = {balances['equity']} {info['baseCoin']}")
+        print(f"Base assets available = {balances['available']} {info['baseCoin']}")
+        print(f"Required for fees     = {required} {info['baseCoin']}\n")
+        
+    # Check if we have at least the minimum buy
+    if balances['available'] < (required):
+        
+        # Report to stdout
+        message = f"Going to buy {required} {info['baseCoin']} for fees"
+        defs.announce(message)
+        
+        # Buy minimum
+        result = exchange.place_market_order(info['buyBase'])
+        response   = result[0]
+        error_code = result[1]
+        error_msg  = result[2]
+
+        # Check if buy error was successful
+        if error_code !=0:
+            
+            # Report error
+            message = f"*** Warning: Buy for fees failed ****\n>>> Message: {error_code} - {error_msg}"
+            defs.log_error(message)
+
+    # Report execution time
+    if speed: defs.announce(defs.report_exec(stime))
+
+    # Return
+    return
+
 # Do we have enough funds to buy
 def check_buy(info):
 
@@ -353,6 +408,10 @@ def check_buy(info):
         message = f"*** Error: You need to have more than {required} {info['quoteCoin']} free to trade! ***"
         defs.log_error(message)
         
+    # Check if we need to buy the smallest amount for fees
+    if config.equity_for_fees:
+        check_buy_fees(info)
+    
     # Report execution time
     if speed: defs.announce(defs.report_exec(stime))
 
@@ -648,10 +707,10 @@ def rebalance(all_buys, info):
     if debug:
         defs.announce(f"Debug: Before: Rebalance equity on exchange: {equity_exchange} {info['baseCoin']}")
         defs.announce(f"Debug: Before: Rebalance equity in database: {equity_database} {info['baseCoin']}")
-        defs.announce(f"Debug: Before: Exchange equity including margin: {equity_exchange * (1 + (config.rebalance_margin / 100))}")
+        defs.announce(f"Debug: Before: Exchange equity including margin: {equity_exchange + (info['buyBase'] * (config.rebalance_margin / 100))}")
 
     # Selling more than we have
-    while equity_database > equity_exchange * (1 + (config.rebalance_margin / 100)):
+    while equity_database > equity_exchange + (info['buyBase'] * (config.rebalance_margin / 100)):
         
         # Database changed
         dbase_changed = True

@@ -128,7 +128,7 @@ def check_order(spot, compounding, active_order, all_buys, all_sells, info, forc
            
            # ...then via Apprise to another platform
             if active_order['side'] == "Sell":
-                message  = f"sold {defs.format_number(active_order['qty'], info['basePrecision'])} {info['baseCoin']}, "
+                message  = f"sold {defs.round_number(active_order['qty'], info['basePrecision'], 'down')} {info['baseCoin']}, "
                 message += f"profit is {defs.format_number(revenue, info['quotePrecision'])} {info['quoteCoin']}"
                 defs.announce(message, True)
            
@@ -608,9 +608,9 @@ def adjust_tp_order(active_order, info):
     error_msg  = ""
        
     # Report to stdout
-    message  = f"Adjusting trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
+    message  = f"Trying to adjust trigger price from {defs.format_number(active_order['trigger'], info['tickSize'])} to "
     message += f"{defs.format_number(active_order['trigger_new'], info['tickSize'])} {info['quoteCoin']} "
-    message += f"at price {defs.format_number(active_order['current'], info['tickSize'])}"
+    message += f"({defs.format_number(active_order['current'], info['tickSize'])})"
     defs.announce(message)
    
     # Amend order for price
