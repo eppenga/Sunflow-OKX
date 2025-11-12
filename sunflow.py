@@ -1088,47 +1088,63 @@ def _loop_exception_handler(loop, context):
 async def _watch_halt(state, poll_ms=200):
     while not defs.halt_sunflow:
         await asyncio.sleep(poll_ms / 1000.0)
+
     # On halt, stop whatever runners are current
     for r in list(state["runners"]):
         r.stop()
 
+    # Also wake the resubscribe watcher so it can exit quickly
+    resubmit_event.set()
+
 # Watcher that handles resubscribe cycles
-async def _watch_resubscribe(state):
+async def _watch_resubscribe(state, poll_ms=200):
     while not getattr(defs, "halt_sunflow", False):
-        await resubmit_event.wait()
-        resubmit_event.clear()
+        # Only do resubscribe work if the event is set
+        if resubmit_event.is_set():
+            resubmit_event.clear()
 
-        # Stop existing runners
-        for r in list(state["runners"]):
-            r.stop()
+            # Double-check halt before doing any resubscribe work
+            if getattr(defs, "halt_sunflow", False):
+                break
 
-        # Give them a moment to unwind
-        await asyncio.sleep(0.1)
+            # Stop existing runners
+            for r in list(state["runners"]):
+                r.stop()
 
-        # Cancel old tasks
-        for t in list(state["tasks"]):
-            if not t.done():
-                t.cancel()
-        state["tasks"].clear()
+            # Give them a moment to unwind
+            await asyncio.sleep(0.1)
 
-        # Rebuild runners and tasks from live config
-        new_runners = build_runners()
-        if not new_runners:
-            defs.log_error("*** Error: Resubscribe attempted, but no streams enabled. Check settings. ***")
-            continue
+            # Cancel old tasks
+            for t in list(state["tasks"]):
+                if not t.done():
+                    t.cancel()
+            state["tasks"].clear()
 
-        state["runners"].clear()
-        state["runners"].extend(new_runners)
+            # Rebuild runners and tasks from live config
+            new_runners = build_runners()
+            if not new_runners:
+                defs.log_error(
+                    "*** Error: Resubscribe attempted, but no streams enabled. Check settings. ***"
+                )
+                continue
 
-        new_tasks = [asyncio.create_task(r.run_forever(), name=f"runner-{i}") for i, r in enumerate(new_runners)]
-        for t in new_tasks:
-            t.add_done_callback(_log_task_result)
+            state["runners"].clear()
+            state["runners"].extend(new_runners)
 
-        state["tasks"].extend(new_tasks)
+            new_tasks = [
+                asyncio.create_task(r.run_forever(), name=f"runner-{i}")
+                for i, r in enumerate(new_runners)
+            ]
+            for t in new_tasks:
+                t.add_done_callback(_log_task_result)
 
-        # Report to stdout
-        defs.announce("*** Websocket streams resubscribed ***")
+            state["tasks"].extend(new_tasks)
 
+            # Report to stdout
+            defs.announce("*** Websocket streams resubscribed ***")
+
+        # Sleep briefly so we can re-check halt_sunflow
+        await asyncio.sleep(poll_ms / 1000.0)
 
 # Run tasks on a periodic basis
 async def _housekeeping_loop(poll_ms=200):
