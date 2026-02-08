@@ -255,7 +255,7 @@ def handle_ticker(message):
         # Lock handle_ticker function
         lock_ticker['enabled'] = True
 
-        # Run trailing if active
+        # Run trailing on every tick regardless of price change
         if active_order['active']:
             result       = trailing.trail(ticker['lastPrice'], compounding, active_order, info, all_buys, all_sells, prices)
             active_order = result[0]
