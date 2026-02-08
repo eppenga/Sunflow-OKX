@@ -227,6 +227,12 @@ def handle_ticker(message):
         current_time        = defs.now_utc()[4]
         lock_ticker['time'] = current_time
         
+        # Show raw incoming message
+        if debug:
+            defs.announce(f"Debug: *** Raw incoming ticker data ***")
+            pprint.pprint(message)
+            print()
+        
         # Decode message and get the latest ticker
         ticker['time']          = int(message['data'][0]['ts'])
         ticker['lastPrice']     = float(message['data'][0]['last'])
